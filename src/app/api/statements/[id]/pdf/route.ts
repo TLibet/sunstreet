@@ -50,31 +50,15 @@ function formatDate(d: Date): string {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-function getBookingRevenue(booking: any, year: number, month: number): number {
-  const nightlyRates = booking.nightlyRates as { date: string; rate: number }[] | null;
-  const msStr = `${year}-${String(month).padStart(2, "0")}`;
-
-  if (nightlyRates) {
-    return nightlyRates.filter((nr: any) => nr.date.startsWith(msStr)).reduce((s: number, nr: any) => s + nr.rate, 0);
-  }
-
-  const ci = new Date(booking.checkIn);
-  const co = new Date(booking.checkOut);
-  const totalNights = Math.round((co.getTime() - ci.getTime()) / 86400000);
-  const perNight = totalNights > 0 ? Number(booking.baseAmount) / totalNights : 0;
-  const mStart = new Date(year, month - 1, 1);
-  const mEnd = new Date(year, month, 1);
-  const effStart = ci > mStart ? ci : mStart;
-  const effEnd = co < mEnd ? co : mEnd;
-  const nightsInMonth = Math.max(0, Math.round((effEnd.getTime() - effStart.getTime()) / 86400000));
-  return perNight * nightsInMonth;
+function getBookingRevenue(booking: any): number {
+  return Number(booking.payout);
 }
 
 function generateStatementHtml(statement: any, period: string, bookingsByUnit: Record<string, any[]>, baseUrl: string): string {
   const snapshotSections = statement.snapshots.map((s: any) => {
     const bookings = bookingsByUnit[s.unitId] || [];
     const bookingRows = bookings.map((b: any) => {
-      const rev = getBookingRevenue(b, statement.year, statement.month);
+      const rev = getBookingRevenue(b);
       return `<tr>
         <td>${b.guestName || "Guest"}</td>
         <td>${b.source}</td>
@@ -85,7 +69,7 @@ function generateStatementHtml(statement: any, period: string, bookingsByUnit: R
       </tr>`;
     }).join("");
 
-    const totalRev = bookings.reduce((sum: number, b: any) => sum + getBookingRevenue(b, statement.year, statement.month), 0);
+    const totalRev = bookings.reduce((sum: number, b: any) => sum + getBookingRevenue(b), 0);
 
     return `
       <div class="unit-section">
@@ -105,7 +89,7 @@ function generateStatementHtml(statement: any, period: string, bookingsByUnit: R
           </thead>
           <tbody>
             ${bookingRows}
-            <tr class="total-row"><td colspan="5" style="text-align:right;font-weight:bold">Total</td><td class="money" style="font-weight:bold">$${totalRev.toFixed(2)}</td></tr>
+            <tr class="total-row"><td colspan="5" style="text-align:right;font-weight:bold">Gross Revenue</td><td class="money" style="font-weight:bold">$${totalRev.toFixed(2)}</td></tr>
           </tbody>
         </table>
         ` : ""}

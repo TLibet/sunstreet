@@ -122,43 +122,17 @@ export default async function StatementDetailPage({
 
         const bookingRows = unitBookings
           .filter((b: any) => b.source !== "OWNER_HOLD" && b.source !== "MAINTENANCE" && b.source !== "MAJOR_HOLIDAY")
-          .map((b: any) => {
-            const nightlyRates = b.nightlyRates as { date: string; rate: number }[] | null;
-            let revenueThisMonth = 0;
+          .map((b: any) => ({
+            id: b.id,
+            guestName: b.guestName || "Guest",
+            source: b.source,
+            confirmation: b.channelConfirmation || "-",
+            checkIn: new Date(b.checkIn),
+            checkOut: new Date(b.checkOut),
+            revenue: Number(b.payout),
+          }));
 
-            if (nightlyRates) {
-              const msStr = `${statement.year}-${String(statement.month).padStart(2, "0")}`;
-              for (const nr of nightlyRates) {
-                if (nr.date.startsWith(msStr)) {
-                  revenueThisMonth += nr.rate;
-                }
-              }
-            } else {
-              // Uniform rate fallback
-              const ci = new Date(b.checkIn);
-              const co = new Date(b.checkOut);
-              const totalNights = Math.round((co.getTime() - ci.getTime()) / 86400000);
-              const perNight = totalNights > 0 ? Number(b.baseAmount) / totalNights : 0;
-
-              // Count nights in this month
-              const effectiveStart = ci > monthStart ? ci : monthStart;
-              const effectiveEnd = co < new Date(monthEnd.getTime() + 86400000) ? co : new Date(monthEnd.getTime() + 86400000);
-              const nightsInMonth = Math.round((effectiveEnd.getTime() - effectiveStart.getTime()) / 86400000);
-              revenueThisMonth = perNight * Math.max(0, nightsInMonth);
-            }
-
-            return {
-              id: b.id,
-              guestName: b.guestName || "Guest",
-              source: b.source,
-              confirmation: b.channelConfirmation || "-",
-              checkIn: new Date(b.checkIn),
-              checkOut: new Date(b.checkOut),
-              revenue: Math.round(revenueThisMonth * 100) / 100,
-            };
-          });
-
-        const bookingRevenueTotal = bookingRows.reduce((s: number, r: any) => s + r.revenue, 0);
+        const grossRevenue = bookingRows.reduce((s: number, r: any) => s + r.revenue, 0);
 
         return (
           <Card key={snapshot.id}>
@@ -225,8 +199,8 @@ export default async function StatementDetailPage({
                         ))}
                         {/* Total row */}
                         <tr className="bg-[#FAFAF7] font-semibold">
-                          <td colSpan={5} className="px-3 py-2 text-right text-[#6B7862]">Total Booking Revenue</td>
-                          <td className="px-3 py-2 text-right font-mono text-[#2D3028]">${bookingRevenueTotal.toFixed(2)}</td>
+                          <td colSpan={5} className="px-3 py-2 text-right text-[#6B7862]">Gross Revenue</td>
+                          <td className="px-3 py-2 text-right font-mono text-[#2D3028]">${grossRevenue.toFixed(2)}</td>
                         </tr>
                       </tbody>
                     </table>
