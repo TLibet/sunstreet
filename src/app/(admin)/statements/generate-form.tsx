@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Dialog,
@@ -25,8 +24,10 @@ const MONTHS = [
 export function GenerateStatementsForm({ owners, units }: { owners: Owner[]; units: Unit[] }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [mode, setMode] = useState<"owner" | "unit">("owner");
+  const [mode, setMode] = useState<"owner" | "unit">("unit");
   const now = new Date();
+  const lastMonth = now.getMonth() === 0 ? 12 : now.getMonth(); // previous month (1-indexed)
+  const lastMonthYear = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
 
   async function handleSubmit(formData: FormData) {
     setLoading(true);
@@ -118,7 +119,7 @@ export function GenerateStatementsForm({ owners, units }: { owners: Owner[]; uni
               <Label className="text-[#6B7862]">Month</Label>
               <select
                 name="month"
-                defaultValue={String(now.getMonth() + 1)}
+                defaultValue={String(lastMonth)}
                 className="w-full h-10 rounded-md border border-[#E2DED6] bg-white px-3 text-sm text-[#2D3028] focus:border-[#C9A84C] focus:outline-none focus:ring-1 focus:ring-[#C9A84C]"
               >
                 {MONTHS.map((name, i) => (
@@ -128,7 +129,15 @@ export function GenerateStatementsForm({ owners, units }: { owners: Owner[]; uni
             </div>
             <div className="space-y-2">
               <Label className="text-[#6B7862]">Year</Label>
-              <Input name="year" type="number" defaultValue={now.getFullYear()} />
+              <select
+                name="year"
+                defaultValue={String(lastMonthYear)}
+                className="w-full h-10 rounded-md border border-[#E2DED6] bg-white px-3 text-sm text-[#2D3028] focus:border-[#C9A84C] focus:outline-none focus:ring-1 focus:ring-[#C9A84C]"
+              >
+                {[lastMonthYear - 1, lastMonthYear, lastMonthYear + 1].map((y) => (
+                  <option key={y} value={String(y)}>{y}</option>
+                ))}
+              </select>
             </div>
           </div>
 
