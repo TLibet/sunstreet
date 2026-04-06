@@ -11,13 +11,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { FileText } from "lucide-react";
 import { generateStatements, generateUnitStatementAction } from "./actions";
 
@@ -92,43 +85,46 @@ export function GenerateStatementsForm({ owners, units }: { owners: Owner[]; uni
           {mode === "owner" ? (
             <div className="space-y-2">
               <Label className="text-[#6B7862]">Owner</Label>
-              <Select name="ownerId" defaultValue="all">
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Owners</SelectItem>
-                  {owners.map((o) => (
-                    <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <select
+                name="ownerId"
+                defaultValue="all"
+                className="w-full h-10 rounded-md border border-[#E2DED6] bg-white px-3 text-sm text-[#2D3028] focus:border-[#C9A84C] focus:outline-none focus:ring-1 focus:ring-[#C9A84C]"
+              >
+                <option value="all">All Owners</option>
+                {owners.map((o) => (
+                  <option key={o.id} value={o.id}>{o.name}</option>
+                ))}
+              </select>
             </div>
           ) : (
             <div className="space-y-2">
               <Label className="text-[#6B7862]">Unit</Label>
-              <Select name="unitId" required>
-                <SelectTrigger><SelectValue placeholder="Select a unit" /></SelectTrigger>
-                <SelectContent>
-                  {units.map((u) => (
-                    <SelectItem key={u.id} value={u.id}>
-                      {u.unitNumber} - {u.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <select
+                name="unitId"
+                required
+                defaultValue=""
+                className="w-full h-10 rounded-md border border-[#E2DED6] bg-white px-3 text-sm text-[#2D3028] focus:border-[#C9A84C] focus:outline-none focus:ring-1 focus:ring-[#C9A84C]"
+              >
+                <option value="" disabled>Select a unit</option>
+                {units.map((u) => (
+                  <option key={u.id} value={u.id}>{u.unitNumber} - {u.name}</option>
+                ))}
+              </select>
             </div>
           )}
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label className="text-[#6B7862]">Month</Label>
-              <Select name="month" defaultValue={String(now.getMonth() + 1)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {MONTHS.map((name, i) => (
-                    <SelectItem key={i + 1} value={String(i + 1)}>{name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <select
+                name="month"
+                defaultValue={String(now.getMonth() + 1)}
+                className="w-full h-10 rounded-md border border-[#E2DED6] bg-white px-3 text-sm text-[#2D3028] focus:border-[#C9A84C] focus:outline-none focus:ring-1 focus:ring-[#C9A84C]"
+              >
+                {MONTHS.map((name, i) => (
+                  <option key={i + 1} value={String(i + 1)}>{name}</option>
+                ))}
+              </select>
             </div>
             <div className="space-y-2">
               <Label className="text-[#6B7862]">Year</Label>
