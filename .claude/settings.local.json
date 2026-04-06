@@ -38,7 +38,8 @@
       "WebSearch",
       "Bash(curl -s \"https://sunstreet-one.vercel.app/api/sync?properties=true\")",
       "Bash(curl -s -X POST \"https://sunstreet-one.vercel.app/api/sync\" -H \"Content-Type: application/json\" -d '{\"\"\"\"startDate\"\"\"\": \"\"\"\"2025-01-01\"\"\"\", \"\"\"\"endDate\"\"\"\": \"\"\"\"2026-12-31\"\"\"\"}')",
-      "Bash(curl -s \"https://sunstreet-one.vercel.app/api/sync?debug=true\")"
+      "Bash(curl -s \"https://sunstreet-one.vercel.app/api/sync?debug=true\")",
+      "Bash(curl -s \"https://sunstreet-one.vercel.app/api/debug\")"
     ]
   }
 }

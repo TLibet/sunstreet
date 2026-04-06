@@ -26,16 +26,8 @@ export async function GET(request: NextRequest) {
       propertyUuidsQueried: propertyUuids,
       reservationsFound: reservations.data.length,
       reservationsMeta: reservations.meta,
-      sampleReservations: reservations.data.slice(0, 3).map((r: any) => ({
-        uuid: r.uuid,
-        property_uuid: r.property_uuid,
-        listing_uuid: r.listing_uuid,
-        platform: r.platform,
-        guest_name: r.guest_name,
-        check_in: r.check_in,
-        check_out: r.check_out,
-        status: r.status,
-      })),
+      sampleReservations: reservations.data.slice(0, 2),
+      allKeys: reservations.data.length > 0 ? Object.keys(reservations.data[0]) : [],
     });
   } catch (error) {
     return NextResponse.json(
