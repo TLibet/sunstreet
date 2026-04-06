@@ -60,8 +60,6 @@ function generateStatementHtml(statement: any, period: string, bookingsByUnit: R
     const bookingRows = bookings.map((b: any) => {
       const rev = getBookingRevenue(b);
       return `<tr>
-        <td>${b.guestName || "Guest"}</td>
-        <td>${b.source}</td>
         <td style="font-family:monospace;font-size:11px">${b.channelConfirmation || "-"}</td>
         <td>${formatDate(new Date(b.checkIn))}</td>
         <td>${formatDate(new Date(b.checkOut))}</td>
@@ -85,11 +83,11 @@ function generateStatementHtml(statement: any, period: string, bookingsByUnit: R
         <h4>Bookings</h4>
         <table class="bookings-table">
           <thead>
-            <tr><th>Guest</th><th>Source</th><th>Confirmation</th><th>Check-in</th><th>Check-out</th><th style="text-align:right">Revenue</th></tr>
+            <tr><th>Confirmation</th><th>Check-in</th><th>Check-out</th><th style="text-align:right">Revenue</th></tr>
           </thead>
           <tbody>
             ${bookingRows}
-            <tr class="total-row"><td colspan="5" style="text-align:right;font-weight:bold">Gross Revenue</td><td class="money" style="font-weight:bold">$${totalRev.toFixed(2)}</td></tr>
+            <tr class="total-row"><td colspan="3" style="text-align:right;font-weight:bold">Gross Revenue</td><td class="money" style="font-weight:bold">$${totalRev.toFixed(2)}</td></tr>
           </tbody>
         </table>
         ` : ""}

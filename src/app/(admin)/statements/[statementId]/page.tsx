@@ -166,25 +166,15 @@ export default async function StatementDetailPage({
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="bg-[#FAFAF7] border-b border-[#E8ECE5]">
-                          <th className="px-3 py-2 text-left text-xs font-medium text-[#6B7862]">Guest</th>
-                          <th className="px-3 py-2 text-left text-xs font-medium text-[#6B7862]">Source</th>
                           <th className="px-3 py-2 text-left text-xs font-medium text-[#6B7862]">Confirmation</th>
                           <th className="px-3 py-2 text-left text-xs font-medium text-[#6B7862]">Check-in</th>
                           <th className="px-3 py-2 text-left text-xs font-medium text-[#6B7862]">Check-out</th>
-                          <th className="px-3 py-2 text-right text-xs font-medium text-[#6B7862]">Net Revenue</th>
+                          <th className="px-3 py-2 text-right text-xs font-medium text-[#6B7862]">Revenue</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-[#E8ECE5]">
                         {bookingRows.map((row: any) => (
                           <tr key={row.id} className="hover:bg-[#FAFAF7]">
-                            <td className="px-3 py-2">
-                              <Link href={`/bookings/${row.id}`} className="text-[#C9A84C] hover:underline font-medium">
-                                {row.guestName}
-                              </Link>
-                            </td>
-                            <td className="px-3 py-2">
-                              <Badge variant="outline" className={`text-xs ${SOURCE_BADGE[row.source] || ""}`}>{row.source}</Badge>
-                            </td>
                             <td className="px-3 py-2 text-[#6B7862] font-mono text-xs">{row.confirmation}</td>
                             <td className="px-3 py-2 text-[#6B7862]">
                               {row.checkIn.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
@@ -197,9 +187,8 @@ export default async function StatementDetailPage({
                             </td>
                           </tr>
                         ))}
-                        {/* Total row */}
                         <tr className="bg-[#FAFAF7] font-semibold">
-                          <td colSpan={5} className="px-3 py-2 text-right text-[#6B7862]">Gross Revenue</td>
+                          <td colSpan={3} className="px-3 py-2 text-right text-[#6B7862]">Gross Revenue</td>
                           <td className="px-3 py-2 text-right font-mono text-[#2D3028]">${grossRevenue.toFixed(2)}</td>
                         </tr>
                       </tbody>
