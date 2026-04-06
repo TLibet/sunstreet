@@ -56,13 +56,13 @@ export default async function BookingsPage() {
               </thead>
               <tbody className="divide-y divide-[#E8ECE5]">
                 {bookings.map((b) => (
-                  <tr key={b.id} className="hover:bg-[#FAFAF7] transition-colors">
+                  <tr key={b.id} className="hover:bg-[#FAFAF7] transition-colors cursor-pointer" onClick={() => {}}>
                     <td className="px-4 py-3">
-                      <Link href={`/units/${b.unitId}`} className="font-medium text-[#C9A84C] hover:underline">{b.unit.unitNumber}</Link>
+                      <Link href={`/bookings/${b.id}`} className="font-medium text-[#C9A84C] hover:underline">{b.unit.unitNumber}</Link>
                       <p className="text-xs text-[#8E9B85]">{b.unit.owner.name}</p>
                     </td>
                     <td className="px-4 py-3">
-                      <Link href={`/bookings/${b.id}`} className="font-medium text-[#2D3028] hover:text-[#C9A84C] transition-colors">{b.guestName || "-"}</Link>
+                      <Link href={`/bookings/${b.id}`} className="font-medium text-[#2D3028] hover:text-[#C9A84C] transition-colors">{b.guestName || "Guest"}</Link>
                     </td>
                     <td className="px-4 py-3"><Badge variant="outline" className={SOURCE_STYLE[b.source]}>{b.source}</Badge></td>
                     <td className="px-4 py-3 text-[#6B7862]">{new Date(b.checkIn).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</td>

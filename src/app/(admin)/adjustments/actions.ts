@@ -25,15 +25,25 @@ export async function createAdjustment(formData: FormData) {
   });
 
   await prisma.adjustment.create({
-    data: {
-      unitId: data.unitId,
-      month: data.month,
-      year: data.year,
-      category: data.category,
-      description: data.description,
-      amount: data.amount,
-      createdBy: "admin",
-    },
+    data: { ...data, createdBy: "admin" },
+  });
+
+  revalidatePath("/adjustments");
+}
+
+export async function updateAdjustment(id: string, formData: FormData) {
+  const data = adjustmentSchema.parse({
+    unitId: formData.get("unitId"),
+    month: formData.get("month"),
+    year: formData.get("year"),
+    category: formData.get("category"),
+    description: formData.get("description"),
+    amount: formData.get("amount"),
+  });
+
+  await prisma.adjustment.update({
+    where: { id },
+    data,
   });
 
   revalidatePath("/adjustments");
