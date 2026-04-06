@@ -1,79 +1,61 @@
-"use client";
-
-import { useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { prisma } from "@/lib/prisma";
+import { notFound } from "next/navigation";
+import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { ArrowLeft } from "lucide-react";
-import Link from "next/link";
+import { UnitSettingsForm } from "./settings-form";
 
-export default function UnitSettingsPage() {
-  const params = useParams();
-  const router = useRouter();
-  const [loading, setLoading] = useState(false);
-  const [newFee, setNewFee] = useState("");
+export const dynamic = "force-dynamic";
 
-  async function handleUpdateFee(e: React.FormEvent) {
-    e.preventDefault();
-    if (!newFee) return;
-    setLoading(true);
+export default async function UnitSettingsPage({
+  params,
+}: {
+  params: Promise<{ unitId: string }>;
+}) {
+  const { unitId } = await params;
 
-    const res = await fetch(`/api/units/${params.unitId}/fee`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ percentage: parseFloat(newFee) }),
-    });
+  const [unit, owners] = await Promise.all([
+    prisma.unit.findUnique({
+      where: { id: unitId },
+      include: {
+        owner: { select: { id: true, name: true } },
+        feeConfigs: { where: { effectiveTo: null }, take: 1 },
+      },
+    }),
+    prisma.owner.findMany({
+      where: { isActive: true },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
+  ]);
 
-    if (res.ok) {
-      router.push(`/units/${params.unitId}`);
-      router.refresh();
-    }
-    setLoading(false);
-  }
+  if (!unit) notFound();
+
+  const currentFee = unit.feeConfigs[0]
+    ? (Number(unit.feeConfigs[0].percentage) * 100).toFixed(1)
+    : "";
 
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <Link href={`/units/${params.unitId}`}>
-          <Button variant="ghost" size="icon">
+        <Link href={`/units/${unitId}`}>
+          <Button variant="ghost" size="icon" className="hover:bg-[#E8ECE5]">
             <ArrowLeft className="h-4 w-4" />
           </Button>
         </Link>
-        <h1 className="text-2xl font-bold">Unit Settings</h1>
+        <div>
+          <h1 className="text-2xl font-bold text-[#2D3028]">Unit {unit.unitNumber} Settings</h1>
+          <p className="text-sm text-[#8E9B85]">{unit.name}</p>
+        </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Management Fee</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleUpdateFee} className="space-y-4">
-            <div className="space-y-2">
-              <Label>New Management Fee Percentage</Label>
-              <div className="flex items-center gap-2">
-                <Input
-                  type="number"
-                  step="0.1"
-                  placeholder="15"
-                  value={newFee}
-                  onChange={(e) => setNewFee(e.target.value)}
-                  className="w-32"
-                />
-                <span className="text-gray-500">%</span>
-              </div>
-              <p className="text-xs text-gray-400">
-                The new rate will take effect immediately and apply to future calculations.
-                Previous months will retain the old rate.
-              </p>
-            </div>
-            <Button type="submit" disabled={loading || !newFee}>
-              {loading ? "Updating..." : "Update Fee"}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+      <UnitSettingsForm
+        unitId={unitId}
+        currentOwnerId={unit.ownerId}
+        currentFee={currentFee}
+        owners={owners}
+      />
     </div>
   );
 }
