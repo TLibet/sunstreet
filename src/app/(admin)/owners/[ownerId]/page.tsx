@@ -42,7 +42,7 @@ export default async function OwnerDetailPage({
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <Link href="/admin/owners">
+        <Link href="/owners">
           <Button variant="ghost" size="icon">
             <ArrowLeft className="h-4 w-4" />
           </Button>
@@ -79,7 +79,7 @@ export default async function OwnerDetailPage({
               : "Not set";
 
             return (
-              <Link key={unit.id} href={`/admin/units/${unit.id}`}>
+              <Link key={unit.id} href={`/units/${unit.id}`}>
                 <Card className="transition-shadow hover:shadow-md cursor-pointer">
                   <CardHeader className="pb-2">
                     <div className="flex items-center justify-between">
@@ -110,7 +110,7 @@ export default async function OwnerDetailPage({
             {owner.statements.map((stmt) => (
               <Link
                 key={stmt.id}
-                href={`/admin/statements/${stmt.id}`}
+                href={`/statements/${stmt.id}`}
                 className="flex items-center justify-between rounded-lg border p-4 hover:bg-gray-50"
               >
                 <div className="flex items-center gap-3">

@@ -27,7 +27,7 @@ export default async function OwnersPage() {
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {owners.map((owner) => (
-          <Link key={owner.id} href={`/admin/owners/${owner.id}`}>
+          <Link key={owner.id} href={`/owners/${owner.id}`}>
             <Card className="transition-shadow hover:shadow-md cursor-pointer">
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">

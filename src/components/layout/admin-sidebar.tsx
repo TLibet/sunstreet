@@ -17,13 +17,13 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
 const navItems = [
-  { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/admin/owners", label: "Owners", icon: Users },
-  { href: "/admin/units", label: "Units", icon: Building2 },
-  { href: "/admin/bookings", label: "Bookings", icon: CalendarDays },
-  { href: "/admin/statements", label: "Statements", icon: FileText },
-  { href: "/admin/adjustments", label: "Adjustments", icon: PlusCircle },
-  { href: "/admin/settings", label: "Settings", icon: Settings },
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/owners", label: "Owners", icon: Users },
+  { href: "/units", label: "Units", icon: Building2 },
+  { href: "/bookings", label: "Bookings", icon: CalendarDays },
+  { href: "/statements", label: "Statements", icon: FileText },
+  { href: "/adjustments", label: "Adjustments", icon: PlusCircle },
+  { href: "/settings", label: "Settings", icon: Settings },
 ];
 
 export function AdminSidebar() {
@@ -32,7 +32,7 @@ export function AdminSidebar() {
   return (
     <aside className="flex h-screen w-64 flex-col border-r bg-white">
       <div className="flex h-16 items-center border-b px-6">
-        <Link href="/admin/dashboard" className="flex items-center gap-2">
+        <Link href="/dashboard" className="flex items-center gap-2">
           <Building2 className="h-6 w-6 text-blue-600" />
           <span className="text-xl font-bold">Sunstreet</span>
         </Link>

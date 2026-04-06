@@ -48,7 +48,7 @@ export default async function UnitsPage() {
             : "Not set";
 
           return (
-            <Link key={unit.id} href={`/admin/units/${unit.id}`}>
+            <Link key={unit.id} href={`/units/${unit.id}`}>
               <Card className="transition-shadow hover:shadow-md cursor-pointer">
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">

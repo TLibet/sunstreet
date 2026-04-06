@@ -18,7 +18,17 @@
       "Bash(ls node_modules/.prisma/client/libquery_engine*)",
       "Bash(export PATH=/opt/homebrew/bin:$PATH)",
       "Bash(git log:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "WebFetch(domain:sunstreet-f4kg98vro-toddlibet-8390s-projects.vercel.app)",
+      "WebFetch(domain:sunstreet-one.vercel.app)",
+      "Bash(npx vercel:*)",
+      "Bash(npx dotenv:*)",
+      "Bash(POSTGRES_PRISMA_URL=\"postgresql://neondb_owner:npg_91CwOZPxyrEJ@ep-young-hat-amjbb4iw-pooler.c-5.us-east-1.aws.neon.tech/neondb?channel_binding=require&connect_timeout=15&sslmode=require\" POSTGRES_URL_NON_POOLING=\"postgresql://neondb_owner:npg_91CwOZPxyrEJ@ep-young-hat-amjbb4iw.c-5.us-east-1.aws.neon.tech/neondb?channel_binding=require&sslmode=require\" npx prisma db push)",
+      "Bash(POSTGRES_PRISMA_URL=\"postgresql://neondb_owner:npg_91CwOZPxyrEJ@ep-young-hat-amjbb4iw-pooler.c-5.us-east-1.aws.neon.tech/neondb?channel_binding=require&connect_timeout=15&sslmode=require\" POSTGRES_URL_NON_POOLING=\"postgresql://neondb_owner:npg_91CwOZPxyrEJ@ep-young-hat-amjbb4iw.c-5.us-east-1.aws.neon.tech/neondb?channel_binding=require&sslmode=require\" npx tsx prisma/seed.ts)",
+      "Bash(xargs perl:*)",
+      "Bash(grep -rn /admin/ src/ --include=*.ts --include=*.tsx)"
     ]
   }
 }

@@ -31,7 +31,7 @@ export async function createOwner(formData: FormData) {
     },
   });
 
-  revalidatePath("/admin/owners");
+  revalidatePath("/owners");
 }
 
 export async function updateOwner(id: string, formData: FormData) {
@@ -54,6 +54,6 @@ export async function updateOwner(id: string, formData: FormData) {
     },
   });
 
-  revalidatePath("/admin/owners");
-  revalidatePath(`/admin/owners/${id}`);
+  revalidatePath("/owners");
+  revalidatePath(`/owners/${id}`);
 }

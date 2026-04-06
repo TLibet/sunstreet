@@ -36,10 +36,10 @@ export async function createAdjustment(formData: FormData) {
     },
   });
 
-  revalidatePath("/admin/adjustments");
+  revalidatePath("/adjustments");
 }
 
 export async function deleteAdjustment(id: string) {
   await prisma.adjustment.delete({ where: { id } });
-  revalidatePath("/admin/adjustments");
+  revalidatePath("/adjustments");
 }

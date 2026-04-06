@@ -57,7 +57,7 @@ export default async function StatementsPage() {
                   <tr key={stmt.id} className="border-b hover:bg-gray-50">
                     <td className="px-4 py-3 font-medium">
                       <Link
-                        href={`/admin/statements/${stmt.id}`}
+                        href={`/statements/${stmt.id}`}
                         className="text-blue-600 hover:underline"
                       >
                         {stmt.owner.name}

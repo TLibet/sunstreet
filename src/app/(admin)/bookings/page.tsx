@@ -55,7 +55,7 @@ export default async function BookingsPage() {
                   <tr key={booking.id} className="border-b hover:bg-gray-50">
                     <td className="px-4 py-3">
                       <Link
-                        href={`/admin/units/${booking.unitId}`}
+                        href={`/units/${booking.unitId}`}
                         className="font-medium text-blue-600 hover:underline"
                       >
                         {booking.unit.unitNumber}

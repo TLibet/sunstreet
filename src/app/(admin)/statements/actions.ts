@@ -21,7 +21,7 @@ export async function generateStatements(formData: FormData) {
     await generateStatement(ownerId, year, month);
   }
 
-  revalidatePath("/admin/statements");
+  revalidatePath("/statements");
 }
 
 export async function finalizeStatement(statementId: string) {
@@ -37,6 +37,6 @@ export async function finalizeStatement(statementId: string) {
     });
   });
 
-  revalidatePath("/admin/statements");
-  revalidatePath(`/admin/statements/${statementId}`);
+  revalidatePath("/statements");
+  revalidatePath(`/statements/${statementId}`);
 }

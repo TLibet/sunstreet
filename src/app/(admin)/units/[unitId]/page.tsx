@@ -53,7 +53,7 @@ export default async function UnitDetailPage({
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <Link href="/admin/units">
+        <Link href="/units">
           <Button variant="ghost" size="icon">
             <ArrowLeft className="h-4 w-4" />
           </Button>
@@ -63,7 +63,7 @@ export default async function UnitDetailPage({
           <p className="text-sm text-gray-500">
             {unit.name} | Owner:{" "}
             <Link
-              href={`/admin/owners/${unit.owner.id}`}
+              href={`/owners/${unit.owner.id}`}
               className="text-blue-600 hover:underline"
             >
               {unit.owner.name}
@@ -77,7 +77,7 @@ export default async function UnitDetailPage({
               Hospitable linked
             </Badge>
           )}
-          <Link href={`/admin/units/${unit.id}/settings`}>
+          <Link href={`/units/${unit.id}/settings`}>
             <Button variant="outline" size="icon">
               <Settings className="h-4 w-4" />
             </Button>

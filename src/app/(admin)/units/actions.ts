@@ -45,8 +45,8 @@ export async function createUnit(formData: FormData) {
     });
   }
 
-  revalidatePath("/admin/units");
-  revalidatePath("/admin/owners");
+  revalidatePath("/units");
+  revalidatePath("/owners");
 }
 
 export async function updateManagementFee(
@@ -70,5 +70,5 @@ export async function updateManagementFee(
     },
   });
 
-  revalidatePath(`/admin/units/${unitId}`);
+  revalidatePath(`/units/${unitId}`);
 }

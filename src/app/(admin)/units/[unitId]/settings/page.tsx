@@ -27,7 +27,7 @@ export default function UnitSettingsPage() {
     });
 
     if (res.ok) {
-      router.push(`/admin/units/${params.unitId}`);
+      router.push(`/units/${params.unitId}`);
       router.refresh();
     }
     setLoading(false);
@@ -36,7 +36,7 @@ export default function UnitSettingsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <Link href={`/admin/units/${params.unitId}`}>
+        <Link href={`/units/${params.unitId}`}>
           <Button variant="ghost" size="icon">
             <ArrowLeft className="h-4 w-4" />
           </Button>
