@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -119,6 +120,7 @@ export function BookingCalendar({
   initialMonth,
   initialYear,
 }: Props) {
+  const router = useRouter();
   const now = new Date();
   const [month, setMonth] = useState(initialMonth || now.getMonth() + 1);
   const [year, setYear] = useState(initialYear || now.getFullYear());
@@ -201,9 +203,10 @@ export function BookingCalendar({
           return (
             <div
               key={day.date}
+              onClick={day.booking ? () => router.push(`/bookings/${day.booking!.id}`) : undefined}
               className={cn(
                 "grid grid-cols-[60px_50px_1fr_100px] border-t text-sm",
-                day.booking ? colorClass : isWeekend ? "bg-gray-50" : "bg-white"
+                day.booking ? `${colorClass} cursor-pointer hover:brightness-95 transition-all` : isWeekend ? "bg-gray-50" : "bg-white"
               )}
             >
               <div className="px-3 py-1.5 font-medium">{day.dayOfMonth}</div>
