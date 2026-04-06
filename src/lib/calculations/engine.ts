@@ -152,14 +152,8 @@ export async function calculateMonthlySummary(
   });
 
   const mgmtFeePercentage = feeConfig ? Number(feeConfig.percentage) : 0;
-  const mgmtFeeAmount = monthlyTotal * mgmtFeePercentage;
-
-  steps.push({
-    step: "mgmtFee",
-    description: `Management fee: ${(mgmtFeePercentage * 100).toFixed(1)}% of $${monthlyTotal.toFixed(2)}`,
-    inputs: { mgmtFeePercentage, monthlyTotal },
-    result: mgmtFeeAmount,
-  });
+  // Note: preliminary fee on nightly rates only; final fee recalculated below
+  // after adjustments and cancellation income are included in the commission total
 
   // 4. Aggregate booking-level fees/income (only for bookings with check-in in this month)
   let cleaningIncome = 0;
@@ -251,56 +245,59 @@ export async function calculateMonthlySummary(
     result: adjustments.reduce((sum, a) => sum + Number(a.amount), 0),
   });
 
-  // 6. Calculate totals
+  // 6. Monthly Total for commission includes adjusted amounts and cancellation income
+  // (monthlyTotal from nightly rates was calculated above)
+  const monthlyTotalForCommission = monthlyTotal + adjustedAmounts + cancellationIncome;
+
+  // Recalculate mgmt fee on the commission total
+  const mgmtFeeOnCommission = monthlyTotalForCommission * mgmtFeePercentage;
+
+  steps.push({
+    step: "monthlyTotalForCommission",
+    description: `Monthly total for commission: nightly rates ($${monthlyTotal.toFixed(2)}) + adjusted ($${adjustedAmounts.toFixed(2)}) + cancellation ($${cancellationIncome.toFixed(2)})`,
+    inputs: { monthlyTotal, adjustedAmounts, cancellationIncome },
+    result: monthlyTotalForCommission,
+  });
+
+  // 7. Expense Total includes ALL expenses offset by cleaning/tax income
   const expenseTotal =
-    mgmtFeeAmount +
-    cleaningExpense +
+    mgmtFeeOnCommission +
+    cleaningExpense -
+    cleaningIncome +
     hostServiceFeeTotal +
-    taxExpense +
+    taxExpense -
+    taxIncome +
     suppliesExpense +
     repairsExpense +
     otherExpense +
     sunstreetBalance;
 
-  const grossIncome = monthlyTotal + cleaningIncome + taxIncome;
+  const grossIncome = monthlyTotalForCommission + cleaningIncome + taxIncome;
 
-  const netDueToOwner =
-    monthlyTotal +
-    cancellationIncome +
-    adjustedAmounts +
-    otherIncome +
-    cleaningIncome -
-    cleaningExpense +
-    taxIncome -
-    taxExpense -
-    mgmtFeeAmount -
-    hostServiceFeeTotal -
-    suppliesExpense -
-    repairsExpense -
-    otherExpense -
-    sunstreetBalance;
+  const netDueToOwner = monthlyTotalForCommission - expenseTotal + otherIncome;
 
   steps.push({
     step: "totals",
     description: "Final calculations",
     inputs: {
-      monthlyTotal,
+      monthlyTotalForCommission,
       cleaningIncome,
       cleaningExpense,
       taxIncome,
       taxExpense,
-      mgmtFeeAmount,
+      mgmtFeeOnCommission,
       hostServiceFeeTotal,
       suppliesExpense,
       repairsExpense,
-      cancellationIncome,
-      adjustedAmounts,
       sunstreetBalance,
       otherIncome,
       otherExpense,
     },
     result: netDueToOwner,
   });
+
+  // Use the commission-based mgmt fee
+  const mgmtFeeAmount = mgmtFeeOnCommission;
 
   const calculationLog: CalculationLog = {
     steps,
@@ -310,7 +307,7 @@ export async function calculateMonthlySummary(
 
   return {
     nightlyAverage: round2(nightlyAverage),
-    monthlyTotal: round2(monthlyTotal),
+    monthlyTotal: round2(monthlyTotalForCommission),
     bookedNights,
     totalNights,
     occupancyRate: round4(occupancyRate),
