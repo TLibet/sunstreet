@@ -5,7 +5,12 @@
       "Bash(npm -v)",
       "Bash(export PATH=\"/opt/homebrew/bin:$PATH\")",
       "Bash(npm install:*)",
-      "Bash(npx shadcn@latest init -d)"
+      "Bash(npx shadcn@latest init -d)",
+      "Bash(npx prisma:*)",
+      "Bash(npx shadcn@latest add card table input label dialog select badge separator dropdown-menu avatar sheet tabs textarea popover command sidebar -y)",
+      "Bash(npm run:*)",
+      "Bash(grep -l \"export.*PrismaClient\" /Users/toddlibet/Documents/Claude/Projects/sunstreet/src/generated/prisma/*.ts)",
+      "mcp__Claude_Preview__preview_start"
     ]
   }
 }

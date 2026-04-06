@@ -1,0 +1,304 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("POSTGRES_PRISMA_URL")
+  directUrl = env("POSTGRES_URL_NON_POOLING")
+}
+
+// ============ USER & AUTH ============
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String?
+  role         UserRole @default(OWNER)
+  ownerId      String?
+  owner        Owner?   @relation(fields: [ownerId], references: [id])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([email])
+}
+
+enum UserRole {
+  ADMIN
+  OWNER
+}
+
+// ============ OWNERS & UNITS ============
+
+model Owner {
+  id        String   @id @default(cuid())
+  name      String
+  email     String?
+  phone     String?
+  address   String?
+  notes     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  units      Unit[]
+  users      User[]
+  statements Statement[]
+}
+
+model Unit {
+  id                   String   @id @default(cuid())
+  unitNumber           String   @unique
+  name                 String
+  address              String?
+  hosputableListingId  String?  @unique
+  ownerId              String
+  owner                Owner    @relation(fields: [ownerId], references: [id])
+  isActive             Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  bookings         Booking[]
+  feeConfigs       ManagementFeeConfig[]
+  adjustments      Adjustment[]
+  monthlySnapshots MonthlySnapshot[]
+
+  @@index([ownerId])
+}
+
+// ============ MANAGEMENT FEE HISTORY ============
+
+model ManagementFeeConfig {
+  id            String    @id @default(cuid())
+  unitId        String
+  unit          Unit      @relation(fields: [unitId], references: [id])
+  percentage    Decimal   @db.Decimal(5, 4) // e.g., 0.1500 = 15%
+  effectiveFrom DateTime
+  effectiveTo   DateTime?
+  createdBy     String
+  createdAt     DateTime  @default(now())
+  notes         String?
+
+  @@index([unitId, effectiveFrom])
+}
+
+// ============ BOOKINGS / RESERVATIONS ============
+
+model Booking {
+  id                  String        @id @default(cuid())
+  hosputableId        String?       @unique
+  unitId              String
+  unit                Unit          @relation(fields: [unitId], references: [id])
+
+  // Guest info
+  guestName           String?
+  guestEmail          String?
+  guestPhone          String?
+  numberOfGuests      Int?
+
+  // Dates
+  checkIn             DateTime      @db.Date
+  checkOut            DateTime      @db.Date
+  bookedAt            DateTime?
+
+  // Source/Channel
+  source              BookingSource
+  channelConfirmation String?
+
+  // Status
+  status              BookingStatus @default(CONFIRMED)
+
+  // Financials
+  currency            String        @default("USD")
+  baseAmount          Decimal       @db.Decimal(10, 2) @default(0)
+  cleaningFee         Decimal       @db.Decimal(10, 2) @default(0)
+  hostServiceFee      Decimal       @db.Decimal(10, 2) @default(0)
+  guestServiceFee     Decimal       @db.Decimal(10, 2) @default(0)
+  passThroughTax      Decimal       @db.Decimal(10, 2) @default(0)
+  remittedTax         Decimal       @db.Decimal(10, 2) @default(0)
+  petFee              Decimal       @db.Decimal(10, 2) @default(0)
+  extraGuestFee       Decimal       @db.Decimal(10, 2) @default(0)
+  securityDeposit     Decimal       @db.Decimal(10, 2) @default(0)
+  adjustedAmount      Decimal       @db.Decimal(10, 2) @default(0)
+  payout              Decimal       @db.Decimal(10, 2) @default(0)
+
+  // Per-night rate breakdown: [{date: "2024-01-15", rate: 250.00}, ...]
+  nightlyRates        Json?
+
+  // Sync metadata
+  lastSyncedAt        DateTime?
+  rawApiData          Json?
+
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  @@index([unitId, checkIn])
+  @@index([checkIn, checkOut])
+  @@index([source])
+  @@index([status])
+}
+
+enum BookingSource {
+  AIRBNB
+  VRBO
+  MISTERBNB
+  DIRECT
+  OWNER_HOLD
+  MAINTENANCE
+  MAJOR_HOLIDAY
+  OTHER
+}
+
+enum BookingStatus {
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+  NO_SHOW
+  PENDING
+}
+
+// ============ MANUAL ADJUSTMENTS ============
+
+model Adjustment {
+  id          String             @id @default(cuid())
+  unitId      String
+  unit        Unit               @relation(fields: [unitId], references: [id])
+  month       Int
+  year        Int
+  category    AdjustmentCategory
+  description String
+  amount      Decimal            @db.Decimal(10, 2)
+  createdBy   String
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  snapshotId  String?
+  snapshot    MonthlySnapshot?   @relation(fields: [snapshotId], references: [id])
+
+  @@index([unitId, year, month])
+}
+
+enum AdjustmentCategory {
+  CLEANING_EXPENSE
+  SUPPLIES_RESTOCK
+  REPAIRS_MAINTENANCE
+  TAX_EXPENSE
+  CANCELLATION_INCOME
+  ADJUSTED_AMOUNT
+  SUNSTREET_BALANCE
+  OTHER_INCOME
+  OTHER_EXPENSE
+}
+
+// ============ MONTHLY SNAPSHOT ============
+
+model MonthlySnapshot {
+  id                 String         @id @default(cuid())
+  unitId             String
+  unit               Unit           @relation(fields: [unitId], references: [id])
+  month              Int
+  year               Int
+
+  // Computed summary
+  nightlyAverage     Decimal        @db.Decimal(10, 2)
+  monthlyTotal       Decimal        @db.Decimal(10, 2)
+  bookedNights       Int
+  totalNights        Int
+  occupancyRate      Decimal        @db.Decimal(5, 4)
+
+  // Fee calculation
+  mgmtFeePercentage  Decimal        @db.Decimal(5, 4)
+  mgmtFeeAmount      Decimal        @db.Decimal(10, 2)
+
+  // Income aggregates
+  cleaningIncome     Decimal        @db.Decimal(10, 2)
+  taxIncome          Decimal        @db.Decimal(10, 2)
+  cancellationIncome Decimal        @db.Decimal(10, 2)
+  otherIncome        Decimal        @db.Decimal(10, 2) @default(0)
+
+  // Expense aggregates
+  cleaningExpense    Decimal        @db.Decimal(10, 2)
+  hostServiceFee     Decimal        @db.Decimal(10, 2)
+  taxExpense         Decimal        @db.Decimal(10, 2)
+  suppliesExpense    Decimal        @db.Decimal(10, 2)
+  repairsExpense     Decimal        @db.Decimal(10, 2)
+  otherExpense       Decimal        @db.Decimal(10, 2) @default(0)
+  adjustedAmounts    Decimal        @db.Decimal(10, 2) @default(0)
+  sunstreetBalance   Decimal        @db.Decimal(10, 2) @default(0)
+
+  // Totals
+  expenseTotal       Decimal        @db.Decimal(10, 2)
+  grossIncome        Decimal        @db.Decimal(10, 2)
+  netDueToOwner      Decimal        @db.Decimal(10, 2)
+
+  // Audit trail
+  calculationLog     Json
+
+  // Status
+  status             SnapshotStatus @default(DRAFT)
+  generatedAt        DateTime       @default(now())
+  finalizedAt        DateTime?
+  finalizedBy        String?
+
+  adjustments        Adjustment[]
+  statementId        String?
+  statement          Statement?     @relation(fields: [statementId], references: [id])
+
+  @@unique([unitId, year, month])
+  @@index([year, month])
+}
+
+enum SnapshotStatus {
+  DRAFT
+  FINALIZED
+  SENT
+}
+
+// ============ STATEMENTS / INVOICES ============
+
+model Statement {
+  id               String          @id @default(cuid())
+  ownerId          String
+  owner            Owner           @relation(fields: [ownerId], references: [id])
+  month            Int
+  year             Int
+
+  totalDueToOwner  Decimal         @db.Decimal(10, 2)
+  totalGrossIncome Decimal         @db.Decimal(10, 2)
+  totalMgmtFees    Decimal         @db.Decimal(10, 2)
+
+  pdfUrl           String?
+  excelUrl         String?
+
+  status           StatementStatus @default(DRAFT)
+  sentAt           DateTime?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  snapshots        MonthlySnapshot[]
+
+  @@unique([ownerId, year, month])
+  @@index([year, month])
+}
+
+enum StatementStatus {
+  DRAFT
+  FINALIZED
+  SENT
+}
+
+// ============ SYNC LOG ============
+
+model SyncLog {
+  id             String    @id @default(cuid())
+  syncType       String
+  status         String
+  startedAt      DateTime  @default(now())
+  completedAt    DateTime?
+  recordsCreated Int       @default(0)
+  recordsUpdated Int       @default(0)
+  errorMessage   String?
+  details        Json?
+}
