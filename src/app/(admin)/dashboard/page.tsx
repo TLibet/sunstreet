@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Building2, Users, CalendarDays } from "lucide-react";
+import { Building2, Users, CalendarDays, TrendingUp, TrendingDown } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { MgmtFeesChart } from "./mgmt-fees-chart";
 import { YearOverYearChart } from "./yoy-chart";
@@ -12,11 +12,17 @@ async function getStats() {
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
-  const [ownerCount, unitCount, bookingCount, recentBookings, allBookings, feeConfigs] = await Promise.all([
+  const lastYearStart = new Date(now.getFullYear() - 1, now.getMonth(), 1);
+  const lastYearEnd = new Date(now.getFullYear() - 1, now.getMonth() + 1, 0);
+
+  const [ownerCount, unitCount, bookingCount, lastYearBookingCount, recentBookings, allBookings, feeConfigs] = await Promise.all([
     prisma.owner.count({ where: { isActive: true } }),
     prisma.unit.count({ where: { isActive: true } }),
     prisma.booking.count({
       where: { status: "CONFIRMED", checkIn: { lte: monthEnd }, checkOut: { gte: monthStart } },
+    }),
+    prisma.booking.count({
+      where: { status: "CONFIRMED", checkIn: { lte: lastYearEnd }, checkOut: { gte: lastYearStart } },
     }),
     prisma.booking.findMany({
       where: { status: { not: "CANCELLED" }, checkIn: { gte: new Date() } },
@@ -78,18 +84,19 @@ async function getStats() {
     return row;
   });
 
-  return { ownerCount, unitCount, bookingCount, recentBookings, chartData, yoyData, years };
+  const bookingYoYPct = lastYearBookingCount > 0
+    ? Math.round(((bookingCount - lastYearBookingCount) / lastYearBookingCount) * 1000) / 10
+    : null;
+
+  return { ownerCount, unitCount, bookingCount, lastYearBookingCount, bookingYoYPct, recentBookings, chartData, yoyData, years };
 }
 
 export default async function AdminDashboard() {
   const [stats, session] = await Promise.all([getStats(), auth()]);
   const userName = session?.user?.name?.split(" ")[0] || "there";
 
-  const statCards = [
-    { label: "Active Owners", value: stats.ownerCount, icon: Users, color: "border-[#C9A84C]" },
-    { label: "Active Units", value: stats.unitCount, icon: Building2, color: "border-[#7D8B73]" },
-    { label: "Bookings This Month", value: stats.bookingCount, icon: CalendarDays, color: "border-[#C9A84C]" },
-  ];
+  const yoyUp = stats.bookingYoYPct !== null && stats.bookingYoYPct >= 0;
+  const yoyDown = stats.bookingYoYPct !== null && stats.bookingYoYPct < 0;
 
   return (
     <div className="space-y-8">
@@ -99,19 +106,53 @@ export default async function AdminDashboard() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
-        {statCards.map((card) => (
-          <Card key={card.label} className={`border-l-4 ${card.color}`}>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-[#6B7862]">{card.label}</p>
-                  <p className="text-3xl font-bold text-[#2D3028] mt-1">{card.value}</p>
-                </div>
-                <card.icon className="h-8 w-8 text-[#C9A84C]/40" />
+        <Card className="border-l-4 border-[#C9A84C]">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-[#6B7862]">Active Owners</p>
+                <p className="text-3xl font-bold text-[#2D3028] mt-1">{stats.ownerCount}</p>
               </div>
-            </CardContent>
-          </Card>
-        ))}
+              <Users className="h-8 w-8 text-[#C9A84C]/40" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-l-4 border-[#7D8B73]">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-[#6B7862]">Active Units</p>
+                <p className="text-3xl font-bold text-[#2D3028] mt-1">{stats.unitCount}</p>
+              </div>
+              <Building2 className="h-8 w-8 text-[#C9A84C]/40" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-l-4 border-[#C9A84C]">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-[#6B7862]">Bookings This Month</p>
+                <p className="text-3xl font-bold text-[#2D3028] mt-1">{stats.bookingCount}</p>
+                {stats.bookingYoYPct !== null && (
+                  <div className={`flex items-center gap-1 mt-1 ${yoyUp ? "text-green-600" : "text-red-600"}`}>
+                    {yoyUp ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
+                    <span className="text-xs font-semibold">
+                      {yoyUp ? "+" : ""}{stats.bookingYoYPct}% vs last year
+                    </span>
+                    <span className="text-[10px] text-[#8E9B85] ml-1">({stats.lastYearBookingCount})</span>
+                  </div>
+                )}
+                {stats.bookingYoYPct === null && stats.lastYearBookingCount === 0 && (
+                  <p className="text-[10px] text-[#8E9B85] mt-1">No data for last year</p>
+                )}
+              </div>
+              <CalendarDays className="h-8 w-8 text-[#C9A84C]/40" />
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Charts */}
