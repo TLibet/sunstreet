@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { BookingsFilter } from "./bookings-filter";
 
 export const dynamic = 'force-dynamic';
 
@@ -16,11 +17,20 @@ const SOURCE_STYLE: Record<string, string> = {
   OTHER: "bg-gray-50 text-gray-600 border-gray-200",
 };
 
-async function getBookings() {
+async function getBookings(unitId?: string) {
   return prisma.booking.findMany({
+    where: unitId ? { unitId } : undefined,
     include: { unit: { select: { unitNumber: true, name: true, owner: { select: { name: true } } } } },
     orderBy: { checkIn: "desc" },
     take: 200,
+  });
+}
+
+async function getUnits() {
+  return prisma.unit.findMany({
+    where: { isActive: true },
+    select: { id: true, unitNumber: true, name: true },
+    orderBy: { unitNumber: "asc" },
   });
 }
 
@@ -28,15 +38,25 @@ function nights(ci: Date, co: Date) {
   return Math.round((co.getTime() - ci.getTime()) / 86400000);
 }
 
-export default async function BookingsPage() {
-  const bookings = await getBookings();
+export default async function BookingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ unit?: string }>;
+}) {
+  const params = await searchParams;
+  const [bookings, units] = await Promise.all([getBookings(params.unit), getUnits()]);
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-[#2D3028]">Bookings</h1>
-        <p className="text-sm text-[#8E9B85] mt-1">{bookings.length} reservations</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-[#2D3028]">Bookings</h1>
+          <p className="text-sm text-[#8E9B85] mt-1">{bookings.length} reservations</p>
+        </div>
       </div>
+
+      <BookingsFilter units={units} selectedUnitId={params.unit} />
+
       <Card>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
@@ -73,7 +93,7 @@ export default async function BookingsPage() {
                     <td className="px-4 py-3 text-right font-mono font-medium text-[#C9A84C]">${Number(b.payout).toFixed(0)}</td>
                   </tr>
                 ))}
-                {bookings.length === 0 && <tr><td colSpan={9} className="px-4 py-12 text-center text-[#8E9B85]">No bookings yet.</td></tr>}
+                {bookings.length === 0 && <tr><td colSpan={9} className="px-4 py-12 text-center text-[#8E9B85]">No bookings found.</td></tr>}
               </tbody>
             </table>
           </div>
