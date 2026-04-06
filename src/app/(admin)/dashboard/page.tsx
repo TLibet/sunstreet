@@ -17,7 +17,7 @@ async function getStats() {
       where: { status: "CONFIRMED", checkIn: { lte: monthEnd }, checkOut: { gte: monthStart } },
     }),
     prisma.booking.findMany({
-      where: { status: { not: "CANCELLED" } },
+      where: { status: { not: "CANCELLED" }, checkIn: { gte: new Date() } },
       include: { unit: { select: { unitNumber: true, name: true } } },
       orderBy: { checkIn: "asc" },
       take: 8,

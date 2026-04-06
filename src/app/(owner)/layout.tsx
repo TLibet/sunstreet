@@ -6,6 +6,7 @@ import { signOut, useSession } from "next-auth/react";
 import { LayoutDashboard, FileText, Building2, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Logo } from "@/components/logo";
 
 const navItems = [
   { href: "/owner-dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -28,7 +29,7 @@ export default function OwnerLayout({ children }: { children: React.ReactNode })
       <aside className="flex h-screen w-64 flex-col bg-[#7D8B73] shadow-xl">
         <div className="flex h-20 items-center justify-center px-4 border-b border-[#6B7862]">
           <Link href="/owner-dashboard">
-            <img src="/logo.svg" alt="Sun Street Properties" className="h-14 w-auto" />
+            <Logo className="h-14" variant="light" />
           </Link>
         </div>
 

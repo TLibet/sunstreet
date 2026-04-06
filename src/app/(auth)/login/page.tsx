@@ -6,6 +6,7 @@ import { useState, Suspense } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Logo } from "@/components/logo";
 
 function LoginForm() {
   const router = useRouter();
@@ -57,7 +58,7 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-[#7D8B73]">
       <div className="w-full max-w-md">
         <div className="flex justify-center mb-8">
-          <img src="/logo.svg" alt="Sun Street Properties" className="h-20" />
+          <Logo className="h-20" variant="light" />
         </div>
         <div className="bg-white rounded-2xl shadow-2xl p-8">
           <div className="text-center mb-6">
