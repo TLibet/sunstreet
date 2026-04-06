@@ -35,6 +35,8 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({ status: "ok" });
 }
 
+export const maxDuration = 60; // Allow up to 60s for sync
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json().catch(() => ({}));

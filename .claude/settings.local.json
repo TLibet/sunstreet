@@ -40,7 +40,10 @@
       "Bash(curl -s -X POST \"https://sunstreet-one.vercel.app/api/sync\" -H \"Content-Type: application/json\" -d '{\"\"\"\"startDate\"\"\"\": \"\"\"\"2025-01-01\"\"\"\", \"\"\"\"endDate\"\"\"\": \"\"\"\"2026-12-31\"\"\"\"}')",
       "Bash(curl -s \"https://sunstreet-one.vercel.app/api/sync?debug=true\")",
       "Bash(curl -s \"https://sunstreet-one.vercel.app/api/debug\")",
-      "Bash(curl -s -X POST \"https://sunstreet-one.vercel.app/api/sync\" -H \"Content-Type: application/json\" -d '{\"\"\"\"startDate\"\"\"\":\"\"\"\"2026-01-01\"\"\"\"}')"
+      "Bash(curl -s -X POST \"https://sunstreet-one.vercel.app/api/sync\" -H \"Content-Type: application/json\" -d '{\"\"\"\"startDate\"\"\"\":\"\"\"\"2026-01-01\"\"\"\"}')",
+      "Bash(POSTGRES_PRISMA_URL=\"postgresql://neondb_owner:npg_91CwOZPxyrEJ@ep-young-hat-amjbb4iw-pooler.c-5.us-east-1.aws.neon.tech/neondb?channel_binding=require&connect_timeout=15&sslmode=require\" npx tsx -e ':*)",
+      "Bash(POSTGRES_PRISMA_URL=\"postgresql://neondb_owner:npg_91CwOZPxyrEJ@ep-young-hat-amjbb4iw-pooler.c-5.us-east-1.aws.neon.tech/neondb?channel_binding=require&connect_timeout=15&sslmode=require\" npx tsx scripts/import-properties.ts)",
+      "Bash(curl -s -X POST \"https://sunstreet-one.vercel.app/api/sync\" -H \"Content-Type: application/json\" -d '{\"\"\"\"startDate\"\"\"\": \"\"\"\"2026-02-01\"\"\"\", \"\"\"\"endDate\"\"\"\": \"\"\"\"2026-04-30\"\"\"\"}')"
     ]
   }
 }
