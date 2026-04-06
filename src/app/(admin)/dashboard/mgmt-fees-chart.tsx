@@ -2,8 +2,33 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DollarSign } from "lucide-react";
+import {
+  ComposedChart,
+  Bar,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+} from "recharts";
 
 type DataPoint = { month: string; fees: number };
+
+function CustomTooltip({ active, payload, label }: any) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="bg-white border border-[#E2DED6] rounded-lg shadow-lg px-4 py-3">
+      <p className="text-xs font-semibold text-[#2D3028] mb-1">{label}</p>
+      {payload.map((entry: any, i: number) => (
+        <p key={i} className="text-xs" style={{ color: entry.color }}>
+          {entry.name}: ${entry.value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        </p>
+      ))}
+    </div>
+  );
+}
 
 export function MgmtFeesChart({ data }: { data: DataPoint[] }) {
   const activeData = data.filter((d) => d.fees > 0);
@@ -24,38 +49,14 @@ export function MgmtFeesChart({ data }: { data: DataPoint[] }) {
     );
   }
 
-  const maxFee = Math.max(...activeData.map((d) => d.fees));
   const totalFees = activeData.reduce((sum, d) => sum + d.fees, 0);
 
-  // Running average
-  const runningAvg: number[] = [];
+  // Add running average to data
   let cumSum = 0;
-  for (let i = 0; i < activeData.length; i++) {
-    cumSum += activeData[i].fees;
-    runningAvg.push(cumSum / (i + 1));
-  }
-
-  // Chart layout
-  const labelHeight = 24;
-  const chartTop = 10;
-  const chartBottom = 200;
-  const barAreaHeight = chartBottom - chartTop;
-  const barPadding = 6;
-  const barWidth = 36;
-  const stepWidth = barWidth + barPadding;
-  const svgWidth = activeData.length * stepWidth + barPadding;
-  const svgHeight = chartBottom + labelHeight;
-
-  function yPos(val: number) {
-    return chartBottom - (val / maxFee) * barAreaHeight;
-  }
-
-  // Running average line path
-  const avgPath = runningAvg.map((avg, i) => {
-    const x = barPadding + i * stepWidth + barWidth / 2;
-    const y = yPos(avg);
-    return `${i === 0 ? "M" : "L"} ${x} ${y}`;
-  }).join(" ");
+  const chartData = activeData.map((d, i) => {
+    cumSum += d.fees;
+    return { ...d, avg: Math.round((cumSum / (i + 1)) * 100) / 100 };
+  });
 
   return (
     <Card>
@@ -64,65 +65,54 @@ export function MgmtFeesChart({ data }: { data: DataPoint[] }) {
           <DollarSign className="h-4 w-4 text-[#C9A84C]" />
           Management Fees by Month
         </CardTitle>
-        <div className="flex items-center gap-4 text-xs">
-          <span className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded-sm bg-[#C9A84C]" />
-            <span className="text-[#8E9B85]">Monthly</span>
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="w-4 h-0.5 bg-[#7D8B73] rounded" />
-            <span className="text-[#8E9B85]">Running Avg</span>
-          </span>
-          <span className="text-[#8E9B85]">
-            Total: <span className="font-semibold text-[#C9A84C]">${totalFees.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-          </span>
-        </div>
+        <span className="text-xs text-[#8E9B85]">
+          Total: <span className="font-semibold text-[#C9A84C]">${totalFees.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+        </span>
       </CardHeader>
       <CardContent>
-        <div className="overflow-x-auto mt-2">
-          <svg width={svgWidth} height={svgHeight} className="block">
-            {/* Grid lines */}
-            <line x1="0" y1={yPos(maxFee)} x2={svgWidth} y2={yPos(maxFee)} stroke="#E8ECE5" strokeWidth="1" />
-            <line x1="0" y1={yPos(maxFee / 2)} x2={svgWidth} y2={yPos(maxFee / 2)} stroke="#E8ECE5" strokeWidth="1" strokeDasharray="4" />
-            <line x1="0" y1={chartBottom} x2={svgWidth} y2={chartBottom} stroke="#E2DED6" strokeWidth="1" />
-
-            {/* Y-axis labels */}
-            <text x={2} y={yPos(maxFee) - 4} fontSize="10" fill="#8E9B85" fontFamily="system-ui">${(maxFee / 1000).toFixed(1)}k</text>
-            <text x={2} y={yPos(maxFee / 2) - 4} fontSize="10" fill="#8E9B85" fontFamily="system-ui">${(maxFee / 2000).toFixed(1)}k</text>
-
-            {/* Bars */}
-            {activeData.map((d, i) => {
-              const barH = Math.max((d.fees / maxFee) * barAreaHeight, 3);
-              const x = barPadding + i * stepWidth;
-              const y = chartBottom - barH;
-              return (
-                <g key={i}>
-                  <rect x={x} y={y} width={barWidth} height={barH} rx={3} fill="#C9A84C" opacity={0.85}>
-                    <title>{d.month}: ${d.fees.toLocaleString("en-US", { minimumFractionDigits: 2 })}</title>
-                  </rect>
-                  {barH > 22 && (
-                    <text x={x + barWidth / 2} y={y + 14} textAnchor="middle" fill="white" fontSize="9" fontWeight="600" fontFamily="system-ui">
-                      ${(d.fees / 1000).toFixed(1)}k
-                    </text>
-                  )}
-                  {/* X-axis label — inside SVG, aligned to bar center */}
-                  <text x={x + barWidth / 2} y={chartBottom + 16} textAnchor="middle" fontSize="10" fill="#8E9B85" fontFamily="system-ui">
-                    {d.month}
-                  </text>
-                </g>
-              );
-            })}
-
-            {/* Running average line */}
-            <path d={avgPath} fill="none" stroke="#7D8B73" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-
-            {/* Average dots */}
-            {runningAvg.map((avg, i) => {
-              const x = barPadding + i * stepWidth + barWidth / 2;
-              const y = yPos(avg);
-              return <circle key={i} cx={x} cy={y} r="3" fill="#7D8B73" stroke="white" strokeWidth="1.5" />;
-            })}
-          </svg>
+        <div className="h-72 mt-2">
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#E8ECE5" vertical={false} />
+              <XAxis
+                dataKey="month"
+                tick={{ fontSize: 11, fill: "#8E9B85" }}
+                axisLine={{ stroke: "#E2DED6" }}
+                tickLine={false}
+              />
+              <YAxis
+                tick={{ fontSize: 11, fill: "#8E9B85" }}
+                axisLine={false}
+                tickLine={false}
+                tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
+                width={50}
+              />
+              <Tooltip content={<CustomTooltip />} />
+              <Legend
+                iconSize={10}
+                wrapperStyle={{ fontSize: 11, color: "#8E9B85" }}
+                formatter={(value: string) => <span className="text-[#8E9B85]">{value}</span>}
+              />
+              <Bar
+                dataKey="fees"
+                name="Monthly Fees"
+                fill="#C9A84C"
+                radius={[4, 4, 0, 0]}
+                opacity={0.85}
+                animationDuration={800}
+              />
+              <Line
+                dataKey="avg"
+                name="Running Avg"
+                type="monotone"
+                stroke="#7D8B73"
+                strokeWidth={2.5}
+                dot={{ r: 4, fill: "#7D8B73", stroke: "#fff", strokeWidth: 2 }}
+                activeDot={{ r: 6, fill: "#7D8B73", stroke: "#fff", strokeWidth: 2 }}
+                animationDuration={1200}
+              />
+            </ComposedChart>
+          </ResponsiveContainer>
         </div>
       </CardContent>
     </Card>
