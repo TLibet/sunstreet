@@ -174,8 +174,6 @@ export default async function StatementDetailPage({
           });
 
         const grossRevenue = bookingRows.reduce((s: number, r: any) => s + r.revenue, 0);
-        const totalDiscount = bookingRows.reduce((s: number, r: any) => s + r.discountAmount, 0);
-        const hasAnyDiscount = totalDiscount > 0;
 
         return (
           <Card key={snapshot.id}>
@@ -212,7 +210,6 @@ export default async function StatementDetailPage({
                           <th className="px-3 py-2 text-left text-xs font-medium text-[#6B7862]">Confirmation</th>
                           <th className="px-3 py-2 text-left text-xs font-medium text-[#6B7862]">Check-in</th>
                           <th className="px-3 py-2 text-left text-xs font-medium text-[#6B7862]">Check-out</th>
-                          {hasAnyDiscount && <th className="px-3 py-2 text-right text-xs font-medium text-[#6B7862]">Discount</th>}
                           <th className="px-3 py-2 text-right text-xs font-medium text-[#6B7862]">Revenue</th>
                         </tr>
                       </thead>
@@ -228,11 +225,6 @@ export default async function StatementDetailPage({
                             <td className="px-3 py-2 text-[#6B7862]">
                               {row.checkOut.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                             </td>
-                            {hasAnyDiscount && (
-                              <td className="px-3 py-2 text-right font-mono text-green-600 text-xs">
-                                {row.discountAmount > 0 ? `-$${row.discountAmount.toFixed(2)}` : ""}
-                              </td>
-                            )}
                             <td className="px-3 py-2 text-right">
                               <span className="font-mono font-medium text-[#2D3028]">${row.revenue.toFixed(2)}</span>
                               {row.isCrossMonth && <span className="block text-[10px] text-[#8E9B85]">nightly only</span>}
@@ -240,16 +232,8 @@ export default async function StatementDetailPage({
                           </tr>
                         ))}
                         <tr className="bg-[#FAFAF7] font-semibold">
-                          <td colSpan={hasAnyDiscount ? 3 : 3} className="px-3 py-2 text-right text-[#6B7862]">
-                            {hasAnyDiscount ? "" : "Gross Revenue"}
-                          </td>
-                          {hasAnyDiscount && (
-                            <td className="px-3 py-2 text-right font-mono text-green-600">-${totalDiscount.toFixed(2)}</td>
-                          )}
-                          <td className="px-3 py-2 text-right font-mono text-[#2D3028]">
-                            {hasAnyDiscount && <span className="text-[#6B7862] font-normal mr-2">Gross Revenue</span>}
-                            ${grossRevenue.toFixed(2)}
-                          </td>
+                          <td colSpan={3} className="px-3 py-2 text-right text-[#6B7862]">Gross Revenue</td>
+                          <td className="px-3 py-2 text-right font-mono text-[#2D3028]">${grossRevenue.toFixed(2)}</td>
                         </tr>
                       </tbody>
                     </table>

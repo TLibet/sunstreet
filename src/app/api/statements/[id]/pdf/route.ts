@@ -96,19 +96,15 @@ function generateStatementHtml(statement: any, period: string, bookingsByUnit: R
       const rev = getBookingRevenue(b, statement.year, statement.month);
       const checkIn = new Date(b.checkIn);
       const isCheckInMonth = checkIn.getFullYear() === statement.year && checkIn.getMonth() + 1 === statement.month;
-      const discount = isCheckInMonth ? Number(b.discountAmount || 0) : 0;
-      return { b, rev, isCheckInMonth, discount };
+      return { b, rev, isCheckInMonth };
     });
     const totalRev = bookingData.reduce((sum: number, d: any) => sum + d.rev, 0);
-    const totalDiscount = bookingData.reduce((sum: number, d: any) => sum + d.discount, 0);
-    const hasDiscount = totalDiscount > 0;
 
     const bookingRows = bookingData.map((d: any) => {
       return `<tr>
         <td style="font-family:monospace;font-size:11px">${d.b.channelConfirmation || "-"}</td>
         <td>${formatDate(new Date(d.b.checkIn))}</td>
         <td>${formatDate(new Date(d.b.checkOut))}</td>
-        ${hasDiscount ? `<td class="money" style="color:#16a34a;font-size:11px">${d.discount > 0 ? '-$' + d.discount.toFixed(2) : ''}</td>` : ''}
         <td class="money">$${d.rev.toFixed(2)}${!d.isCheckInMonth ? '<br><span style="font-size:9px;color:#8E9B85">nightly only</span>' : ''}</td>
       </tr>`;
     }).join("");
@@ -127,11 +123,11 @@ function generateStatementHtml(statement: any, period: string, bookingsByUnit: R
         <h4>Bookings</h4>
         <table class="bookings-table">
           <thead>
-            <tr><th>Confirmation</th><th>Check-in</th><th>Check-out</th>${hasDiscount ? '<th style="text-align:right">Discount</th>' : ''}<th style="text-align:right">Revenue</th></tr>
+            <tr><th>Confirmation</th><th>Check-in</th><th>Check-out</th><th style="text-align:right">Revenue</th></tr>
           </thead>
           <tbody>
             ${bookingRows}
-            <tr class="total-row"><td colspan="3" style="text-align:right;font-weight:bold">${hasDiscount ? '' : 'Gross Revenue'}</td>${hasDiscount ? `<td class="money" style="font-weight:bold;color:#16a34a">-$${totalDiscount.toFixed(2)}</td>` : ''}<td class="money" style="font-weight:bold">$${totalRev.toFixed(2)}</td></tr>
+            <tr class="total-row"><td colspan="3" style="text-align:right;font-weight:bold">Gross Revenue</td><td class="money" style="font-weight:bold">$${totalRev.toFixed(2)}</td></tr>
           </tbody>
         </table>
         ` : ""}
