@@ -28,7 +28,9 @@
       "Bash(POSTGRES_PRISMA_URL=\"postgresql://neondb_owner:npg_91CwOZPxyrEJ@ep-young-hat-amjbb4iw-pooler.c-5.us-east-1.aws.neon.tech/neondb?channel_binding=require&connect_timeout=15&sslmode=require\" POSTGRES_URL_NON_POOLING=\"postgresql://neondb_owner:npg_91CwOZPxyrEJ@ep-young-hat-amjbb4iw.c-5.us-east-1.aws.neon.tech/neondb?channel_binding=require&sslmode=require\" npx prisma db push)",
       "Bash(POSTGRES_PRISMA_URL=\"postgresql://neondb_owner:npg_91CwOZPxyrEJ@ep-young-hat-amjbb4iw-pooler.c-5.us-east-1.aws.neon.tech/neondb?channel_binding=require&connect_timeout=15&sslmode=require\" POSTGRES_URL_NON_POOLING=\"postgresql://neondb_owner:npg_91CwOZPxyrEJ@ep-young-hat-amjbb4iw.c-5.us-east-1.aws.neon.tech/neondb?channel_binding=require&sslmode=require\" npx tsx prisma/seed.ts)",
       "Bash(xargs perl:*)",
-      "Bash(grep -rn /admin/ src/ --include=*.ts --include=*.tsx)"
+      "Bash(grep -rn /admin/ src/ --include=*.ts --include=*.tsx)",
+      "Bash(curl -s -X POST https://sunstreet-one.vercel.app/api/webhooks/hospitable -H \"Content-Type: application/json\" -d '{:*)",
+      "Bash(POSTGRES_PRISMA_URL=\"postgresql://neondb_owner:npg_91CwOZPxyrEJ@ep-young-hat-amjbb4iw-pooler.c-5.us-east-1.aws.neon.tech/neondb?channel_binding=require&connect_timeout=15&sslmode=require\" npx tsx -e \":*)"
     ]
   }
 }
