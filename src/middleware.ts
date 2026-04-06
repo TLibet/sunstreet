@@ -9,8 +9,7 @@ export function middleware(request: NextRequest) {
   // Public routes - always accessible
   if (
     pathname.startsWith("/login") ||
-    pathname.startsWith("/api/auth") ||
-    pathname.startsWith("/api/webhooks") ||
+    pathname.startsWith("/api/") ||
     pathname.startsWith("/_next") ||
     pathname === "/favicon.ico"
   ) {
