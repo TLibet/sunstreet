@@ -35,7 +35,8 @@
       "Bash(curl -s https://sunstreet-one.vercel.app/api/sync?test=true)",
       "Bash(curl -s -X POST \"https://sunstreet-one.vercel.app/api/sync\" -H \"Content-Type: application/json\" -d '{}')",
       "WebFetch(domain:developer.hospitable.com)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(curl -s \"https://sunstreet-one.vercel.app/api/sync?properties=true\")"
     ]
   }
 }

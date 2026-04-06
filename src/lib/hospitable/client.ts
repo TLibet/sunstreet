@@ -13,15 +13,8 @@ export class HospitableClient {
     this.baseUrl = baseUrl;
   }
 
-  private async request<T>(path: string, params?: Record<string, string>): Promise<T> {
-    const url = new URL(`${this.baseUrl}${path}`);
-    if (params) {
-      Object.entries(params).forEach(([key, value]) => {
-        if (value) url.searchParams.set(key, value);
-      });
-    }
-
-    const response = await fetch(url.toString(), {
+  private async fetchApi<T>(url: string): Promise<T> {
+    const response = await fetch(url, {
       headers: {
         Authorization: `Bearer ${this.pat}`,
         Accept: "application/json",
@@ -31,9 +24,7 @@ export class HospitableClient {
 
     if (!response.ok) {
       const text = await response.text();
-      throw new Error(
-        `Hospitable API error ${response.status}: ${text}`
-      );
+      throw new Error(`Hospitable API error ${response.status}: ${text}`);
     }
 
     return response.json();
@@ -43,10 +34,10 @@ export class HospitableClient {
     page?: number;
     per_page?: number;
   }): Promise<PaginatedResponse<HospitableProperty>> {
-    return this.request("/properties", {
-      page: String(params?.page || 1),
-      per_page: String(params?.per_page || 50),
-    });
+    const url = new URL(`${this.baseUrl}/properties`);
+    url.searchParams.set("page", String(params?.page || 1));
+    url.searchParams.set("per_page", String(params?.per_page || 50));
+    return this.fetchApi(url.toString());
   }
 
   async getReservations(params?: {
@@ -57,28 +48,31 @@ export class HospitableClient {
     page?: number;
     per_page?: number;
   }): Promise<PaginatedResponse<HospitableReservation>> {
-    const queryParams: Record<string, string> = {
-      page: String(params?.page || 1),
-      per_page: String(params?.per_page || 50),
-    };
+    const url = new URL(`${this.baseUrl}/reservations`);
+    url.searchParams.set("page", String(params?.page || 1));
+    url.searchParams.set("per_page", String(params?.per_page || 50));
 
-    if (params?.start_date) queryParams.start_date = params.start_date;
-    if (params?.end_date) queryParams.end_date = params.end_date;
-    if (params?.include) queryParams.include = params.include;
+    if (params?.start_date) url.searchParams.set("start_date", params.start_date);
+    if (params?.end_date) url.searchParams.set("end_date", params.end_date);
+    if (params?.include) url.searchParams.set("include", params.include);
+
+    // Each property UUID as a separate properties[] param
     if (params?.properties?.length) {
-      queryParams["properties[]"] = params.properties.join(",");
+      for (const propId of params.properties) {
+        url.searchParams.append("properties[]", propId);
+      }
     }
 
-    return this.request("/reservations", queryParams);
+    return this.fetchApi(url.toString());
   }
 
   async getReservation(
     uuid: string,
     include?: string
   ): Promise<{ data: HospitableReservation }> {
-    const params: Record<string, string> = {};
-    if (include) params.include = include;
-    return this.request(`/reservations/${uuid}`, params);
+    const url = new URL(`${this.baseUrl}/reservations/${uuid}`);
+    if (include) url.searchParams.set("include", include);
+    return this.fetchApi(url.toString());
   }
 
   async testConnection(): Promise<boolean> {

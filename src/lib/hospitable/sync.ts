@@ -65,8 +65,8 @@ export async function syncReservations(options?: {
       units.map((u) => [u.hosputableListingId!, u.id])
     );
 
-    // Collect all property UUIDs (both linked and unlinked)
-    const allPropertyUuids = properties.map((p: any) => p.uuid || p.id);
+    // Only sync properties that are linked to units in our system
+    const allPropertyUuids = units.map((u) => u.hosputableListingId!);
 
     // Step 2: Fetch reservations for all properties
     let page = 1;
