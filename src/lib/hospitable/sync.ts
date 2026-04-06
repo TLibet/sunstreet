@@ -67,9 +67,13 @@ function extractFinancials(reservation: any) {
     passThroughTax += centsToDecimal(tax.amount);
   }
 
-  // Discounts (negative amounts)
+  // Discounts - check both host and guest sections
   let discountAmount = 0;
+  const guest = fin.guest || {};
   for (const disc of (host.discounts || [])) {
+    discountAmount += Math.abs(centsToDecimal(disc.amount));
+  }
+  for (const disc of (guest.discounts || [])) {
     discountAmount += Math.abs(centsToDecimal(disc.amount));
   }
 
