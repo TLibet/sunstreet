@@ -48,12 +48,14 @@ export async function syncReservations(options?: {
   });
 
   try {
-    let page = 1;
-    let lastPage = 1;
     let created = 0;
     let updated = 0;
 
-    // Get all units with Hospitable listing IDs
+    // Step 1: Fetch all properties from Hospitable
+    const propertiesResponse = await client.getProperties({ per_page: 100 });
+    const properties = propertiesResponse.data;
+
+    // Build a map of hospitable property UUID -> our unit ID
     const units = await prisma.unit.findMany({
       where: { hosputableListingId: { not: null } },
       select: { id: true, hosputableListingId: true },
@@ -63,8 +65,16 @@ export async function syncReservations(options?: {
       units.map((u) => [u.hosputableListingId!, u.id])
     );
 
+    // Collect all property UUIDs (both linked and unlinked)
+    const allPropertyUuids = properties.map((p: any) => p.uuid || p.id);
+
+    // Step 2: Fetch reservations for all properties
+    let page = 1;
+    let lastPage = 1;
+
     do {
       const response = await client.getReservations({
+        properties: allPropertyUuids,
         start_date: options?.startDate,
         end_date: options?.endDate,
         include: "financials,guest",
@@ -145,10 +155,15 @@ export async function syncReservations(options?: {
         completedAt: new Date(),
         recordsCreated: created,
         recordsUpdated: updated,
+        details: {
+          propertiesFound: properties.length,
+          linkedUnits: units.length,
+          propertyUuids: allPropertyUuids,
+        } as any,
       },
     });
 
-    return { created, updated };
+    return { created, updated, propertiesFound: properties.length };
   } catch (error) {
     await prisma.syncLog.update({
       where: { id: syncLog.id },

@@ -4,6 +4,7 @@ import { syncReservations } from "@/lib/hospitable/sync";
 
 export async function GET(request: NextRequest) {
   const test = request.nextUrl.searchParams.get("test");
+  const listProperties = request.nextUrl.searchParams.get("properties");
 
   if (test) {
     const client = new HospitableClient();
@@ -11,21 +12,31 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ connected });
   }
 
+  if (listProperties) {
+    try {
+      const client = new HospitableClient();
+      const response = await client.getProperties({ per_page: 100 });
+      return NextResponse.json({
+        properties: response.data.map((p: any) => ({
+          uuid: p.uuid || p.id,
+          name: p.name || p.nickname || p.title,
+          address: p.address,
+          platform: p.platform,
+        })),
+      });
+    } catch (error) {
+      return NextResponse.json(
+        { error: error instanceof Error ? error.message : "Failed to fetch properties" },
+        { status: 500 }
+      );
+    }
+  }
+
   return NextResponse.json({ status: "ok" });
 }
 
 export async function POST(request: NextRequest) {
   try {
-    // Verify either admin session or cron secret
-    const cronSecret = request.headers.get("authorization");
-    if (
-      cronSecret &&
-      cronSecret !== `Bearer ${process.env.CRON_SECRET}` &&
-      !process.env.CRON_SECRET
-    ) {
-      // Allow if no CRON_SECRET is set (dev mode)
-    }
-
     const body = await request.json().catch(() => ({}));
     const result = await syncReservations({
       startDate: body.startDate,
