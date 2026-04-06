@@ -12,44 +12,56 @@ import { redirect } from "next/navigation";
 export const dynamic = 'force-dynamic';
 
 async function getStatement(id: string) {
-  return prisma.statement.findUnique({
+  const statement = await prisma.statement.findUnique({
     where: { id },
     include: {
       owner: true,
       snapshots: {
-        include: { unit: { select: { unitNumber: true, name: true } } },
+        include: { unit: { select: { id: true, unitNumber: true, name: true } } },
         orderBy: { unit: { unitNumber: "asc" } },
       },
     },
   });
+  if (!statement) return null;
+
+  // Fetch bookings for each unit in this statement's month
+  const bookingsByUnit: Record<string, any[]> = {};
+  const monthStart = new Date(statement.year, statement.month - 1, 1);
+  const monthEnd = new Date(statement.year, statement.month, 0);
+
+  for (const snapshot of statement.snapshots) {
+    bookingsByUnit[snapshot.unitId] = await prisma.booking.findMany({
+      where: {
+        unitId: snapshot.unitId,
+        checkIn: { lte: monthEnd },
+        checkOut: { gt: monthStart },
+        status: { not: "CANCELLED" },
+      },
+      orderBy: { checkIn: "asc" },
+    });
+  }
+
+  return { statement, bookingsByUnit };
 }
 
-function SummaryRow({
-  label,
-  value,
-  bold,
-  negative,
-}: {
-  label: string;
-  value: number;
-  bold?: boolean;
-  negative?: boolean;
-}) {
-  const formatted = negative
-    ? `-$${Math.abs(value).toFixed(2)}`
-    : `$${value.toFixed(2)}`;
-
+function SummaryRow({ label, value, bold, negative }: { label: string; value: number; bold?: boolean; negative?: boolean }) {
+  const formatted = negative ? `-$${Math.abs(value).toFixed(2)}` : `$${value.toFixed(2)}`;
   return (
     <div className={`flex justify-between py-1 ${bold ? "font-bold" : ""}`}>
-      <span className="text-gray-600">{label}</span>
-      <span
-        className={`font-mono ${negative ? "text-red-600" : ""} ${bold ? "text-lg" : ""}`}
-      >
-        {formatted}
-      </span>
+      <span className="text-[#6B7862]">{label}</span>
+      <span className={`font-mono ${negative ? "text-red-600" : ""} ${bold ? "text-lg text-[#2D3028]" : "text-[#2D3028]"}`}>{formatted}</span>
     </div>
   );
 }
+
+const SOURCE_BADGE: Record<string, string> = {
+  AIRBNB: "bg-red-50 text-red-700",
+  VRBO: "bg-blue-50 text-blue-700",
+  DIRECT: "bg-green-50 text-green-700",
+  MISTERBNB: "bg-purple-50 text-purple-700",
+  OWNER_HOLD: "bg-yellow-50 text-yellow-700",
+  MAINTENANCE: "bg-gray-100 text-gray-600",
+};
 
 export default async function StatementDetailPage({
   params,
@@ -57,215 +69,215 @@ export default async function StatementDetailPage({
   params: Promise<{ statementId: string }>;
 }) {
   const { statementId } = await params;
-  const statement = await getStatement(statementId);
-  if (!statement) notFound();
+  const result = await getStatement(statementId);
+  if (!result) notFound();
+  const { statement, bookingsByUnit } = result;
 
-  const period = new Date(statement.year, statement.month - 1).toLocaleDateString(
-    "en-US",
-    { month: "long", year: "numeric" }
-  );
+  const period = new Date(statement.year, statement.month - 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center gap-4">
         <Link href="/statements">
-          <Button variant="ghost" size="icon">
+          <Button variant="ghost" size="icon" className="hover:bg-[#E8ECE5]">
             <ArrowLeft className="h-4 w-4" />
           </Button>
         </Link>
         <div>
-          <h1 className="text-2xl font-bold">
-            {statement.owner.name} - {period}
-          </h1>
-          <p className="text-sm text-gray-500">
-            {statement.snapshots.length} unit
-            {statement.snapshots.length !== 1 ? "s" : ""}
+          <h1 className="text-2xl font-bold text-[#2D3028]">{statement.owner.name} - {period}</h1>
+          <p className="text-sm text-[#8E9B85]">
+            {statement.snapshots.length} unit{statement.snapshots.length !== 1 ? "s" : ""}
           </p>
         </div>
         <div className="ml-auto flex items-center gap-2">
-          <Badge
-            variant={
-              statement.status === "SENT"
-                ? "default"
-                : statement.status === "FINALIZED"
-                  ? "secondary"
-                  : "outline"
-            }
-          >
+          <Badge variant={statement.status === "SENT" ? "default" : statement.status === "FINALIZED" ? "secondary" : "outline"}>
             {statement.status}
           </Badge>
           <Link href={`/api/statements/${statement.id}/pdf`}>
-            <Button variant="outline" size="sm">
-              <Download className="mr-2 h-4 w-4" />
-              PDF
-            </Button>
+            <Button variant="outline" size="sm"><Download className="mr-2 h-4 w-4" />PDF</Button>
           </Link>
           <Link href={`/api/statements/${statement.id}/excel`}>
-            <Button variant="outline" size="sm">
-              <Download className="mr-2 h-4 w-4" />
-              Excel
-            </Button>
+            <Button variant="outline" size="sm"><Download className="mr-2 h-4 w-4" />Excel</Button>
           </Link>
           {statement.status === "DRAFT" && (
             <form action={finalizeStatement.bind(null, statement.id)}>
               <Button type="submit" size="sm" className="bg-[#7D8B73] hover:bg-[#6B7862] text-white">
-                <Lock className="mr-2 h-4 w-4" />
-                Finalize
+                <Lock className="mr-2 h-4 w-4" />Finalize
               </Button>
             </form>
           )}
-          <form action={async () => {
-            "use server";
-            await deleteStatement(statementId);
-            redirect("/statements");
-          }}>
-            <Button type="submit" size="sm" variant="destructive">
-              <Trash2 className="mr-2 h-4 w-4" />
-              Delete
-            </Button>
+          <form action={async () => { "use server"; await deleteStatement(statementId); redirect("/statements"); }}>
+            <Button type="submit" size="sm" variant="destructive"><Trash2 className="mr-2 h-4 w-4" />Delete</Button>
           </form>
         </div>
       </div>
 
       {/* Per-unit breakdown */}
-      {statement.snapshots.map((snapshot) => (
-        <Card key={snapshot.id}>
-          <CardHeader>
-            <CardTitle className="text-base">
-              Unit {snapshot.unit.unitNumber} - {snapshot.unit.name}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-3 gap-4">
-              <div className="rounded-lg bg-blue-50 p-3">
-                <p className="text-xs text-blue-600">Booked Nights</p>
-                <p className="text-xl font-bold text-blue-900">
-                  {snapshot.bookedNights} / {snapshot.totalNights}
-                </p>
+      {statement.snapshots.map((snapshot) => {
+        const unitBookings = bookingsByUnit[snapshot.unitId] || [];
+        // Calculate per-booking net revenue (base amount for days in this month)
+        const monthStart = new Date(statement.year, statement.month - 1, 1);
+        const monthEnd = new Date(statement.year, statement.month, 0);
+
+        const bookingRows = unitBookings
+          .filter((b: any) => b.source !== "OWNER_HOLD" && b.source !== "MAINTENANCE" && b.source !== "MAJOR_HOLIDAY")
+          .map((b: any) => {
+            const nightlyRates = b.nightlyRates as { date: string; rate: number }[] | null;
+            let revenueThisMonth = 0;
+
+            if (nightlyRates) {
+              const msStr = `${statement.year}-${String(statement.month).padStart(2, "0")}`;
+              for (const nr of nightlyRates) {
+                if (nr.date.startsWith(msStr)) {
+                  revenueThisMonth += nr.rate;
+                }
+              }
+            } else {
+              // Uniform rate fallback
+              const ci = new Date(b.checkIn);
+              const co = new Date(b.checkOut);
+              const totalNights = Math.round((co.getTime() - ci.getTime()) / 86400000);
+              const perNight = totalNights > 0 ? Number(b.baseAmount) / totalNights : 0;
+
+              // Count nights in this month
+              const effectiveStart = ci > monthStart ? ci : monthStart;
+              const effectiveEnd = co < new Date(monthEnd.getTime() + 86400000) ? co : new Date(monthEnd.getTime() + 86400000);
+              const nightsInMonth = Math.round((effectiveEnd.getTime() - effectiveStart.getTime()) / 86400000);
+              revenueThisMonth = perNight * Math.max(0, nightsInMonth);
+            }
+
+            return {
+              id: b.id,
+              guestName: b.guestName || "Guest",
+              source: b.source,
+              confirmation: b.channelConfirmation || "-",
+              checkIn: new Date(b.checkIn),
+              checkOut: new Date(b.checkOut),
+              revenue: Math.round(revenueThisMonth * 100) / 100,
+            };
+          });
+
+        const bookingRevenueTotal = bookingRows.reduce((s: number, r: any) => s + r.revenue, 0);
+
+        return (
+          <Card key={snapshot.id}>
+            <CardHeader>
+              <CardTitle className="text-base text-[#2D3028]">
+                Unit {snapshot.unit.unitNumber} - {snapshot.unit.name}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Stats */}
+              <div className="grid grid-cols-3 gap-4">
+                <div className="rounded-lg bg-[#E8ECE5] p-3">
+                  <p className="text-xs text-[#6B7862]">Booked Nights</p>
+                  <p className="text-xl font-bold text-[#2D3028]">{snapshot.bookedNights} / {snapshot.totalNights}</p>
+                </div>
+                <div className="rounded-lg bg-[#E8ECE5] p-3">
+                  <p className="text-xs text-[#6B7862]">Nightly Average</p>
+                  <p className="text-xl font-bold text-[#2D3028]">${Number(snapshot.nightlyAverage).toFixed(2)}</p>
+                </div>
+                <div className="rounded-lg bg-[#E8ECE5] p-3">
+                  <p className="text-xs text-[#6B7862]">Occupancy</p>
+                  <p className="text-xl font-bold text-[#2D3028]">{(Number(snapshot.occupancyRate) * 100).toFixed(0)}%</p>
+                </div>
               </div>
-              <div className="rounded-lg bg-green-50 p-3">
-                <p className="text-xs text-green-600">Nightly Average</p>
-                <p className="text-xl font-bold text-green-900">
-                  ${Number(snapshot.nightlyAverage).toFixed(2)}
-                </p>
-              </div>
-              <div className="rounded-lg bg-purple-50 p-3">
-                <p className="text-xs text-purple-600">Occupancy</p>
-                <p className="text-xl font-bold text-purple-900">
-                  {(Number(snapshot.occupancyRate) * 100).toFixed(0)}%
-                </p>
-              </div>
-            </div>
 
-            <Separator />
-
-            <div className="space-y-1">
-              <SummaryRow
-                label="Monthly Total (for commission)"
-                value={Number(snapshot.monthlyTotal)}
-                bold
-              />
-              <SummaryRow
-                label="Adjusted Amounts"
-                value={Number(snapshot.adjustedAmounts)}
-              />
-              <SummaryRow
-                label="Cancellation Income"
-                value={Number(snapshot.cancellationIncome)}
-              />
-            </div>
-
-            <Separator />
-
-            <div className="space-y-1">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
-                Expenses
-              </p>
-              <SummaryRow
-                label={`Mgmt Fee (${(Number(snapshot.mgmtFeePercentage) * 100).toFixed(0)}%)`}
-                value={Number(snapshot.mgmtFeeAmount)}
-                negative
-              />
-              <SummaryRow
-                label="Cleaning Income"
-                value={Number(snapshot.cleaningIncome)}
-              />
-              <SummaryRow
-                label="Cleaning Expense"
-                value={Number(snapshot.cleaningExpense)}
-                negative
-              />
-              <SummaryRow
-                label="Host Service Fee"
-                value={Number(snapshot.hostServiceFee)}
-                negative
-              />
-              <SummaryRow
-                label="Tax Income (offset)"
-                value={Number(snapshot.taxIncome)}
-              />
-              <SummaryRow
-                label="Tax Expense"
-                value={Number(snapshot.taxExpense)}
-                negative
-              />
-              <SummaryRow
-                label="Supplies/Restock/Repairs"
-                value={Number(snapshot.suppliesExpense) + Number(snapshot.repairsExpense)}
-                negative
-              />
-              <SummaryRow
-                label="S.Street Balance"
-                value={Number(snapshot.sunstreetBalance)}
-                negative
-              />
+              {/* Bookings table */}
+              {bookingRows.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-[#8E9B85] uppercase tracking-wide mb-2">Bookings</p>
+                  <div className="rounded-lg border border-[#E2DED6] overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-[#FAFAF7] border-b border-[#E8ECE5]">
+                          <th className="px-3 py-2 text-left text-xs font-medium text-[#6B7862]">Guest</th>
+                          <th className="px-3 py-2 text-left text-xs font-medium text-[#6B7862]">Source</th>
+                          <th className="px-3 py-2 text-left text-xs font-medium text-[#6B7862]">Confirmation</th>
+                          <th className="px-3 py-2 text-left text-xs font-medium text-[#6B7862]">Check-in</th>
+                          <th className="px-3 py-2 text-left text-xs font-medium text-[#6B7862]">Check-out</th>
+                          <th className="px-3 py-2 text-right text-xs font-medium text-[#6B7862]">Net Revenue</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#E8ECE5]">
+                        {bookingRows.map((row: any) => (
+                          <tr key={row.id} className="hover:bg-[#FAFAF7]">
+                            <td className="px-3 py-2">
+                              <Link href={`/bookings/${row.id}`} className="text-[#C9A84C] hover:underline font-medium">
+                                {row.guestName}
+                              </Link>
+                            </td>
+                            <td className="px-3 py-2">
+                              <Badge variant="outline" className={`text-xs ${SOURCE_BADGE[row.source] || ""}`}>{row.source}</Badge>
+                            </td>
+                            <td className="px-3 py-2 text-[#6B7862] font-mono text-xs">{row.confirmation}</td>
+                            <td className="px-3 py-2 text-[#6B7862]">
+                              {row.checkIn.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                            </td>
+                            <td className="px-3 py-2 text-[#6B7862]">
+                              {row.checkOut.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                            </td>
+                            <td className="px-3 py-2 text-right font-mono font-medium text-[#2D3028]">
+                              ${row.revenue.toFixed(2)}
+                            </td>
+                          </tr>
+                        ))}
+                        {/* Total row */}
+                        <tr className="bg-[#FAFAF7] font-semibold">
+                          <td colSpan={5} className="px-3 py-2 text-right text-[#6B7862]">Total Booking Revenue</td>
+                          <td className="px-3 py-2 text-right font-mono text-[#2D3028]">${bookingRevenueTotal.toFixed(2)}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
 
               <Separator />
 
-              <SummaryRow
-                label="Expense Total"
-                value={Number(snapshot.expenseTotal)}
-                negative
-                bold
-              />
-            </div>
+              {/* Financial summary */}
+              <div className="space-y-1">
+                <SummaryRow label="Monthly Total (for commission)" value={Number(snapshot.monthlyTotal)} bold />
+                <SummaryRow label="Adjusted Amounts" value={Number(snapshot.adjustedAmounts)} />
+                <SummaryRow label="Cancellation Income" value={Number(snapshot.cancellationIncome)} />
+              </div>
 
-            <Separator />
+              <Separator />
 
-            <SummaryRow
-              label="Net Total Due to Owner"
-              value={Number(snapshot.netDueToOwner)}
-              bold
-            />
-            <SummaryRow
-              label="Gross Income"
-              value={Number(snapshot.grossIncome)}
-            />
-          </CardContent>
-        </Card>
-      ))}
+              <div className="space-y-1">
+                <p className="text-xs font-semibold text-[#8E9B85] uppercase tracking-wide">Expenses</p>
+                <SummaryRow label={`Mgmt Fee (${(Number(snapshot.mgmtFeePercentage) * 100).toFixed(0)}%)`} value={Number(snapshot.mgmtFeeAmount)} negative />
+                <SummaryRow label="Cleaning Income" value={Number(snapshot.cleaningIncome)} />
+                <SummaryRow label="Cleaning Expense" value={Number(snapshot.cleaningExpense)} negative />
+                <SummaryRow label="Host Service Fee" value={Number(snapshot.hostServiceFee)} negative />
+                <SummaryRow label="Tax Income (offset)" value={Number(snapshot.taxIncome)} />
+                <SummaryRow label="Tax Expense" value={Number(snapshot.taxExpense)} negative />
+                <SummaryRow label="Supplies/Restock/Repairs" value={Number(snapshot.suppliesExpense) + Number(snapshot.repairsExpense)} negative />
+                <SummaryRow label="S.Street Balance" value={Number(snapshot.sunstreetBalance)} negative />
+                <Separator />
+                <SummaryRow label="Expense Total" value={Number(snapshot.expenseTotal)} negative bold />
+              </div>
+
+              <Separator />
+
+              <SummaryRow label="Net Total Due to Owner" value={Number(snapshot.netDueToOwner)} bold />
+              <SummaryRow label="Gross Income" value={Number(snapshot.grossIncome)} />
+            </CardContent>
+          </Card>
+        );
+      })}
 
       {/* Grand totals */}
-      <Card className="border-2 border-blue-200">
+      <Card className="border-2 border-[#C9A84C]/30">
         <CardHeader>
-          <CardTitle>Grand Totals</CardTitle>
+          <CardTitle className="text-[#2D3028]">Grand Totals</CardTitle>
         </CardHeader>
         <CardContent>
-          <SummaryRow
-            label="Total Gross Income"
-            value={Number(statement.totalGrossIncome)}
-          />
-          <SummaryRow
-            label="Total Management Fees"
-            value={Number(statement.totalMgmtFees)}
-            negative
-          />
+          <SummaryRow label="Total Gross Income" value={Number(statement.totalGrossIncome)} />
+          <SummaryRow label="Total Management Fees" value={Number(statement.totalMgmtFees)} negative />
           <Separator className="my-2" />
-          <SummaryRow
-            label="Total Net Due to Owner"
-            value={Number(statement.totalDueToOwner)}
-            bold
-          />
+          <SummaryRow label="Total Net Due to Owner" value={Number(statement.totalDueToOwner)} bold />
         </CardContent>
       </Card>
     </div>

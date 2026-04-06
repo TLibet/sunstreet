@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-// PDF generation using a simple HTML-to-PDF approach
-// For production, use @react-pdf/renderer or puppeteer
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -14,7 +12,7 @@ export async function GET(
     include: {
       owner: true,
       snapshots: {
-        include: { unit: { select: { unitNumber: true, name: true } } },
+        include: { unit: { select: { id: true, unitNumber: true, name: true } } },
       },
     },
   });
@@ -23,31 +21,98 @@ export async function GET(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const period = new Date(statement.year, statement.month - 1).toLocaleDateString(
-    "en-US",
-    { month: "long", year: "numeric" }
-  );
+  // Fetch bookings per unit
+  const bookingsByUnit: Record<string, any[]> = {};
+  const monthStart = new Date(statement.year, statement.month - 1, 1);
+  const monthEnd = new Date(statement.year, statement.month, 0);
 
-  // Generate HTML for PDF (can be rendered by browser print or converted)
-  const html = generateStatementHtml(statement, period);
+  for (const snapshot of statement.snapshots) {
+    bookingsByUnit[snapshot.unitId] = await prisma.booking.findMany({
+      where: {
+        unitId: snapshot.unitId,
+        checkIn: { lte: monthEnd },
+        checkOut: { gt: monthStart },
+        status: { not: "CANCELLED" },
+        source: { notIn: ["OWNER_HOLD", "MAINTENANCE", "MAJOR_HOLIDAY"] },
+      },
+      orderBy: { checkIn: "asc" },
+    });
+  }
 
-  return new NextResponse(html, {
-    headers: {
-      "Content-Type": "text/html",
-    },
-  });
+  const period = new Date(statement.year, statement.month - 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  const baseUrl = request.nextUrl.origin;
+  const html = generateStatementHtml(statement, period, bookingsByUnit, baseUrl);
+
+  return new NextResponse(html, { headers: { "Content-Type": "text/html" } });
 }
 
-function generateStatementHtml(statement: any, period: string): string {
-  const snapshotRows = statement.snapshots
-    .map(
-      (s: any) => `
+function formatDate(d: Date): string {
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+function getBookingRevenue(booking: any, year: number, month: number): number {
+  const nightlyRates = booking.nightlyRates as { date: string; rate: number }[] | null;
+  const msStr = `${year}-${String(month).padStart(2, "0")}`;
+
+  if (nightlyRates) {
+    return nightlyRates.filter((nr: any) => nr.date.startsWith(msStr)).reduce((s: number, nr: any) => s + nr.rate, 0);
+  }
+
+  const ci = new Date(booking.checkIn);
+  const co = new Date(booking.checkOut);
+  const totalNights = Math.round((co.getTime() - ci.getTime()) / 86400000);
+  const perNight = totalNights > 0 ? Number(booking.baseAmount) / totalNights : 0;
+  const mStart = new Date(year, month - 1, 1);
+  const mEnd = new Date(year, month, 1);
+  const effStart = ci > mStart ? ci : mStart;
+  const effEnd = co < mEnd ? co : mEnd;
+  const nightsInMonth = Math.max(0, Math.round((effEnd.getTime() - effStart.getTime()) / 86400000));
+  return perNight * nightsInMonth;
+}
+
+function generateStatementHtml(statement: any, period: string, bookingsByUnit: Record<string, any[]>, baseUrl: string): string {
+  const snapshotSections = statement.snapshots.map((s: any) => {
+    const bookings = bookingsByUnit[s.unitId] || [];
+    const bookingRows = bookings.map((b: any) => {
+      const rev = getBookingRevenue(b, statement.year, statement.month);
+      return `<tr>
+        <td>${b.guestName || "Guest"}</td>
+        <td>${b.source}</td>
+        <td style="font-family:monospace;font-size:11px">${b.channelConfirmation || "-"}</td>
+        <td>${formatDate(new Date(b.checkIn))}</td>
+        <td>${formatDate(new Date(b.checkOut))}</td>
+        <td class="money">$${rev.toFixed(2)}</td>
+      </tr>`;
+    }).join("");
+
+    const totalRev = bookings.reduce((sum: number, b: any) => sum + getBookingRevenue(b, statement.year, statement.month), 0);
+
+    return `
       <div class="unit-section">
         <h3>Unit ${s.unit.unitNumber} - ${s.unit.name}</h3>
+
+        <div class="stats">
+          <div class="stat"><span class="stat-label">Booked Nights</span><span class="stat-value">${s.bookedNights} / ${s.totalNights}</span></div>
+          <div class="stat"><span class="stat-label">Nightly Avg</span><span class="stat-value">$${Number(s.nightlyAverage).toFixed(2)}</span></div>
+          <div class="stat"><span class="stat-label">Occupancy</span><span class="stat-value">${(Number(s.occupancyRate) * 100).toFixed(0)}%</span></div>
+        </div>
+
+        ${bookings.length > 0 ? `
+        <h4>Bookings</h4>
+        <table class="bookings-table">
+          <thead>
+            <tr><th>Guest</th><th>Source</th><th>Confirmation</th><th>Check-in</th><th>Check-out</th><th style="text-align:right">Revenue</th></tr>
+          </thead>
+          <tbody>
+            ${bookingRows}
+            <tr class="total-row"><td colspan="5" style="text-align:right;font-weight:bold">Total</td><td class="money" style="font-weight:bold">$${totalRev.toFixed(2)}</td></tr>
+          </tbody>
+        </table>
+        ` : ""}
+
+        <h4>Financial Summary</h4>
         <table>
-          <tr><td>Monthly Total (for commission)</td><td class="money">$${Number(s.monthlyTotal).toFixed(2)}</td></tr>
-          <tr><td># of Booked Nights</td><td>${s.bookedNights} / ${s.totalNights}</td></tr>
-          <tr><td>Nightly Average</td><td class="money">$${Number(s.nightlyAverage).toFixed(2)}</td></tr>
+          <tr><td><strong>Monthly Total (for commission)</strong></td><td class="money"><strong>$${Number(s.monthlyTotal).toFixed(2)}</strong></td></tr>
           <tr><td>Adjusted Amounts</td><td class="money">$${Number(s.adjustedAmounts).toFixed(2)}</td></tr>
           <tr><td>Cancellation Income</td><td class="money">$${Number(s.cancellationIncome).toFixed(2)}</td></tr>
           <tr class="separator"><td colspan="2"><hr></td></tr>
@@ -65,48 +130,57 @@ function generateStatementHtml(statement: any, period: string): string {
           <tr class="bold total"><td>Net Total Due to Owner</td><td class="money">$${Number(s.netDueToOwner).toFixed(2)}</td></tr>
           <tr><td>Gross Income</td><td class="money">$${Number(s.grossIncome).toFixed(2)}</td></tr>
         </table>
-      </div>
-    `
-    )
-    .join("");
+      </div>`;
+  }).join("");
 
   return `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Sunstreet - ${statement.owner.name} - ${period}</title>
+  <title>Sun Street Properties - ${statement.owner.name} - ${period}</title>
   <style>
-    body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 40px; color: #333; }
-    .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #2563eb; padding-bottom: 20px; }
-    .header h1 { color: #2563eb; margin: 0; }
-    .header h2 { color: #666; margin: 5px 0; font-weight: normal; }
-    .owner-info { margin-bottom: 20px; color: #666; }
-    .unit-section { margin-bottom: 30px; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; }
-    .unit-section h3 { margin-top: 0; color: #1f2937; }
-    table { width: 100%; border-collapse: collapse; }
-    td { padding: 6px 0; }
-    td:last-child { text-align: right; }
-    .money { font-family: monospace; }
+    body { font-family: 'Georgia', serif; max-width: 850px; margin: 0 auto; padding: 40px; color: #2D3028; }
+    .header { text-align: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #C9A84C; }
+    .header img { height: 60px; margin-bottom: 10px; }
+    .header h1 { color: #7D8B73; margin: 0; font-size: 14px; letter-spacing: 3px; text-transform: uppercase; }
+    .header h2 { color: #2D3028; margin: 8px 0 0; font-weight: normal; font-size: 20px; }
+    .owner-info { margin-bottom: 25px; color: #6B7862; font-size: 14px; }
+    .unit-section { margin-bottom: 30px; border: 1px solid #E2DED6; border-radius: 8px; padding: 20px; }
+    .unit-section h3 { margin-top: 0; color: #2D3028; font-size: 16px; border-bottom: 1px solid #E8ECE5; padding-bottom: 8px; }
+    .unit-section h4 { color: #7D8B73; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; margin: 16px 0 8px; }
+    .stats { display: flex; gap: 16px; margin-bottom: 16px; }
+    .stat { flex: 1; background: #F5F0E8; border-radius: 6px; padding: 10px; text-align: center; }
+    .stat-label { display: block; font-size: 10px; color: #6B7862; text-transform: uppercase; letter-spacing: 1px; }
+    .stat-value { display: block; font-size: 18px; font-weight: bold; color: #2D3028; margin-top: 2px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    td, th { padding: 5px 0; }
+    td:last-child, th:last-child { text-align: right; }
+    th { text-align: left; }
+    .money { font-family: 'Courier New', monospace; }
     .negative { color: #dc2626; }
     .bold td { font-weight: bold; }
-    .total td { font-size: 1.1em; color: #2563eb; }
+    .total td { font-size: 1.1em; color: #C9A84C; }
     .separator td { padding: 2px 0; }
-    .grand-total { background: #eff6ff; border: 2px solid #2563eb; border-radius: 8px; padding: 20px; margin-top: 20px; }
-    .grand-total h3 { margin-top: 0; color: #2563eb; }
+    .bookings-table { margin-bottom: 16px; }
+    .bookings-table th { font-size: 10px; color: #6B7862; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #E8ECE5; padding: 6px 4px; }
+    .bookings-table td { padding: 6px 4px; border-bottom: 1px solid #F0EDE6; font-size: 12px; }
+    .bookings-table .total-row td { border-top: 2px solid #E2DED6; border-bottom: none; padding-top: 8px; }
+    .grand-total { background: #F5F0E8; border: 2px solid #C9A84C; border-radius: 8px; padding: 20px; margin-top: 20px; }
+    .grand-total h3 { margin-top: 0; color: #C9A84C; }
     @media print { body { padding: 20px; } }
   </style>
 </head>
 <body>
   <div class="header">
-    <h1>Sunstreet</h1>
-    <h2>Owner Statement - ${period}</h2>
+    <img src="${baseUrl}/logo-dark.svg" alt="Sun Street Properties" />
+    <h1>Owner Statement</h1>
+    <h2>${period}</h2>
   </div>
   <div class="owner-info">
     <strong>${statement.owner.name}</strong><br>
-    ${statement.owner.email || ""}<br>
-    ${statement.owner.address || ""}
+    ${statement.owner.email || ""}${statement.owner.address ? "<br>" + statement.owner.address : ""}
   </div>
-  ${snapshotRows}
+  ${snapshotSections}
   <div class="grand-total">
     <h3>Grand Totals</h3>
     <table>
@@ -115,7 +189,6 @@ function generateStatementHtml(statement: any, period: string): string {
       <tr class="bold total"><td>Total Net Due to Owner</td><td class="money">$${Number(statement.totalDueToOwner).toFixed(2)}</td></tr>
     </table>
   </div>
-  <script>window.print && setTimeout(() => {}, 500);</script>
 </body>
 </html>`;
 }
