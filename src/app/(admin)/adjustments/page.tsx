@@ -1,8 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { AdjustmentForm } from "./adjustment-form";
-import { AdjustmentRow } from "./adjustment-row";
+import { AdjustmentsList } from "./adjustments-list";
 
 export const dynamic = 'force-dynamic';
 
@@ -59,40 +58,7 @@ export default async function AdjustmentsPage() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_400px]">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base text-[#2D3028]">Recent Adjustments</CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-[#E8ECE5] bg-[#FAFAF7]">
-                    <th className="px-4 py-3 text-left font-medium text-[#6B7862]">Unit</th>
-                    <th className="px-4 py-3 text-left font-medium text-[#6B7862]">Period</th>
-                    <th className="px-4 py-3 text-left font-medium text-[#6B7862]">Category</th>
-                    <th className="px-4 py-3 text-left font-medium text-[#6B7862]">Description</th>
-                    <th className="px-4 py-3 text-right font-medium text-[#6B7862]">Amount</th>
-                    <th className="px-4 py-3 text-right font-medium text-[#6B7862]">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#E8ECE5]">
-                  {serializedAdjustments.map((adj) => (
-                    <AdjustmentRow key={adj.id} adjustment={adj} units={units} />
-                  ))}
-                  {adjustments.length === 0 && (
-                    <tr>
-                      <td colSpan={6} className="px-4 py-12 text-center text-[#8E9B85]">
-                        No adjustments yet. Add one using the form.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-
+        <AdjustmentsList adjustments={serializedAdjustments} units={units} />
         <AdjustmentForm units={units} />
       </div>
     </div>
