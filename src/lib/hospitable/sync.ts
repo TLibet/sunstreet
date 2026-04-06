@@ -40,7 +40,7 @@ function centsToDecimal(cents: number | undefined): number {
 
 function extractFinancials(reservation: any) {
   const fin = reservation.financials;
-  if (!fin) return { baseAmount: 0, cleaningFee: 0, hostServiceFee: 0, passThroughTax: 0, payout: 0, nightlyRates: undefined };
+  if (!fin) return { baseAmount: 0, cleaningFee: 0, hostServiceFee: 0, passThroughTax: 0, discountAmount: 0, payout: 0, nightlyRates: undefined };
 
   const host = fin.host || {};
   const baseAmount = centsToDecimal(host.accommodation?.amount);
@@ -67,19 +67,34 @@ function extractFinancials(reservation: any) {
     passThroughTax += centsToDecimal(tax.amount);
   }
 
+  // Discounts (negative amounts)
+  let discountAmount = 0;
+  for (const disc of (host.discounts || [])) {
+    discountAmount += Math.abs(centsToDecimal(disc.amount));
+  }
+
   // Payout/revenue
   const payout = centsToDecimal(host.revenue?.amount);
 
   // Nightly rates from accommodation_breakdown
-  let nightlyRates: { date: string; rate: number }[] | undefined;
+  // Store original rate, and if there's a discount, also store the adjusted rate
+  let nightlyRates: { date: string; rate: number; originalRate: number; discountPerNight: number }[] | undefined;
   if (host.accommodation_breakdown?.length) {
-    nightlyRates = host.accommodation_breakdown.map((nb: any) => ({
-      date: nb.label, // label is the date string like "2026-04-11"
-      rate: centsToDecimal(nb.amount),
-    }));
+    const nightCount = host.accommodation_breakdown.length;
+    const discountPerNight = nightCount > 0 ? discountAmount / nightCount : 0;
+
+    nightlyRates = host.accommodation_breakdown.map((nb: any) => {
+      const originalRate = centsToDecimal(nb.amount);
+      return {
+        date: nb.label,
+        originalRate,
+        discountPerNight: Math.round(discountPerNight * 100) / 100,
+        rate: Math.round((originalRate - discountPerNight) * 100) / 100,
+      };
+    });
   }
 
-  return { baseAmount, cleaningFee, hostServiceFee, passThroughTax, payout, nightlyRates };
+  return { baseAmount, cleaningFee, hostServiceFee, passThroughTax, discountAmount, payout, nightlyRates };
 }
 
 export async function syncReservations(options?: {
@@ -159,6 +174,7 @@ export async function syncReservations(options?: {
             cleaningFee: fin.cleaningFee,
             hostServiceFee: fin.hostServiceFee,
             passThroughTax: fin.passThroughTax,
+            discountAmount: fin.discountAmount,
             payout: fin.payout,
             nightlyRates: fin.nightlyRates ? (fin.nightlyRates as any) : undefined,
             lastSyncedAt: new Date(),

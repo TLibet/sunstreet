@@ -20,7 +20,9 @@ declare module "next-auth" {
 
 export type NightlyRate = {
   date: string; // "YYYY-MM-DD"
-  rate: number;
+  rate: number; // adjusted rate (after discount)
+  originalRate?: number; // original rate before discount
+  discountPerNight?: number; // discount amount per night
 };
 
 export type CalculationStep = {

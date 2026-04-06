@@ -59,7 +59,8 @@ export default async function BookingDetailPage({ params }: { params: Promise<{ 
     (new Date(booking.checkOut).getTime() - new Date(booking.checkIn).getTime()) / (1000 * 60 * 60 * 24)
   );
 
-  const nightlyRates = booking.nightlyRates as { date: string; rate: number }[] | null;
+  const nightlyRates = booking.nightlyRates as { date: string; rate: number; originalRate?: number; discountPerNight?: number }[] | null;
+  const hasDiscount = Number(booking.discountAmount) > 0 || nightlyRates?.some((nr) => nr.discountPerNight && nr.discountPerNight > 0);
 
   return (
     <div className="space-y-6">
@@ -134,20 +135,79 @@ export default async function BookingDetailPage({ params }: { params: Promise<{ 
           <CardContent>
             <FinancialRow label="Accommodation" value={Number(booking.baseAmount)} bold />
 
+            {/* Discount summary */}
+            {hasDiscount && (
+              <div className="flex justify-between py-2 text-sm">
+                <span className="text-green-700">Discount</span>
+                <span className="font-mono text-green-700">-${Number(booking.discountAmount).toFixed(2)}</span>
+              </div>
+            )}
+
             {/* Nightly rate breakdown */}
             {nightlyRates && nightlyRates.length > 0 && (
               <div className="mt-2 mb-4 rounded-lg bg-[#FAFAF7] p-3">
                 <p className="text-xs text-[#8E9B85] uppercase tracking-wide mb-2">Nightly Rates</p>
-                <div className="space-y-1">
-                  {nightlyRates.map((nr) => (
-                    <div key={nr.date} className="flex justify-between text-xs">
-                      <span className="text-[#6B7862]">
-                        {new Date(nr.date + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
-                      </span>
-                      <span className="font-mono text-[#2D3028]">${nr.rate.toFixed(2)}</span>
+
+                {/* Header row if discount exists */}
+                {hasDiscount && (
+                  <div className="flex justify-between text-[10px] text-[#8E9B85] uppercase tracking-wide mb-1 pb-1 border-b border-[#E8ECE5]">
+                    <span>Date</span>
+                    <div className="flex gap-4">
+                      <span className="w-16 text-right">Original</span>
+                      <span className="w-16 text-right">Discount</span>
+                      <span className="w-16 text-right">Adjusted</span>
                     </div>
-                  ))}
+                  </div>
+                )}
+
+                <div className="space-y-1">
+                  {nightlyRates.map((nr) => {
+                    const hasNrDiscount = nr.discountPerNight && nr.discountPerNight > 0;
+                    const original = nr.originalRate ?? nr.rate;
+                    const adjusted = nr.rate;
+
+                    return (
+                      <div key={nr.date} className="flex justify-between text-xs">
+                        <span className="text-[#6B7862]">
+                          {new Date(nr.date + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                        </span>
+                        {hasDiscount ? (
+                          <div className="flex gap-4">
+                            <span className="w-16 text-right font-mono text-[#8E9B85] line-through">
+                              ${original.toFixed(2)}
+                            </span>
+                            <span className="w-16 text-right font-mono text-green-600">
+                              {hasNrDiscount ? `-$${nr.discountPerNight!.toFixed(2)}` : "-"}
+                            </span>
+                            <span className="w-16 text-right font-mono font-medium text-[#2D3028]">
+                              ${adjusted.toFixed(2)}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="font-mono text-[#2D3028]">${adjusted.toFixed(2)}</span>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
+
+                {/* Totals row for discounted bookings */}
+                {hasDiscount && (
+                  <div className="flex justify-between text-xs font-semibold mt-2 pt-2 border-t border-[#E8ECE5]">
+                    <span className="text-[#2D3028]">Total</span>
+                    <div className="flex gap-4">
+                      <span className="w-16 text-right font-mono text-[#8E9B85]">
+                        ${nightlyRates.reduce((s, nr) => s + (nr.originalRate ?? nr.rate), 0).toFixed(2)}
+                      </span>
+                      <span className="w-16 text-right font-mono text-green-600">
+                        -${Number(booking.discountAmount).toFixed(2)}
+                      </span>
+                      <span className="w-16 text-right font-mono text-[#2D3028]">
+                        ${nightlyRates.reduce((s, nr) => s + nr.rate, 0).toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

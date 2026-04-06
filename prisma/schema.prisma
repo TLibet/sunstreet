@@ -121,6 +121,7 @@ model Booking {
   petFee              Decimal       @db.Decimal(10, 2) @default(0)
   extraGuestFee       Decimal       @db.Decimal(10, 2) @default(0)
   securityDeposit     Decimal       @db.Decimal(10, 2) @default(0)
+  discountAmount      Decimal       @db.Decimal(10, 2) @default(0)
   adjustedAmount      Decimal       @db.Decimal(10, 2) @default(0)
   payout              Decimal       @db.Decimal(10, 2) @default(0)
 
