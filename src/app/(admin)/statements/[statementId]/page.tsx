@@ -5,8 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, Download, Lock } from "lucide-react";
-import { finalizeStatement } from "../actions";
+import { ArrowLeft, Download, Lock, Trash2 } from "lucide-react";
+import { finalizeStatement, deleteStatement } from "../actions";
+import { redirect } from "next/navigation";
 
 export const dynamic = 'force-dynamic';
 
@@ -107,12 +108,22 @@ export default async function StatementDetailPage({
           </Link>
           {statement.status === "DRAFT" && (
             <form action={finalizeStatement.bind(null, statement.id)}>
-              <Button type="submit" size="sm" variant="destructive">
+              <Button type="submit" size="sm" className="bg-[#7D8B73] hover:bg-[#6B7862] text-white">
                 <Lock className="mr-2 h-4 w-4" />
                 Finalize
               </Button>
             </form>
           )}
+          <form action={async () => {
+            "use server";
+            await deleteStatement(statementId);
+            redirect("/statements");
+          }}>
+            <Button type="submit" size="sm" variant="destructive">
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete
+            </Button>
+          </form>
         </div>
       </div>
 

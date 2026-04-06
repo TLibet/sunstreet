@@ -9,6 +9,44 @@ import { ArrowLeft, User, Calendar, Building2, DollarSign, Mail, Phone, Users, H
 
 export const dynamic = "force-dynamic";
 
+type NightlyRateEntry = { date: string; rate: number; originalRate?: number; discountPerNight?: number };
+
+function expandNightlyRates(rates: NightlyRateEntry[], totalNights: number): NightlyRateEntry[] {
+  // If rates have combined entries like "2026-04-08 (4 nights)", expand to individual nights
+  if (rates.length === 1 && totalNights > 1) {
+    const entry = rates[0];
+    const dateMatch = entry.date.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (dateMatch) {
+      const startDate = new Date(dateMatch[1] + "T00:00:00");
+      const perNightRate = entry.rate / totalNights;
+      const perNightOriginal = (entry.originalRate ?? entry.rate) / totalNights;
+      const expanded: NightlyRateEntry[] = [];
+      for (let i = 0; i < totalNights; i++) {
+        const d = new Date(startDate);
+        d.setDate(d.getDate() + i);
+        const dateStr = d.toISOString().split("T")[0];
+        expanded.push({
+          date: dateStr,
+          rate: Math.round(perNightRate * 100) / 100,
+          originalRate: Math.round(perNightOriginal * 100) / 100,
+          discountPerNight: entry.discountPerNight ? Math.round(entry.discountPerNight / totalNights * 100) / 100 : 0,
+        });
+      }
+      return expanded;
+    }
+  }
+  return rates;
+}
+
+function formatRateDate(dateStr: string): string {
+  // Handle dates like "2026-04-08" or "2026-04-08 (4 nights)"
+  const match = dateStr.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (match) {
+    return new Date(match[1] + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  }
+  return dateStr;
+}
+
 const SOURCE_STYLE: Record<string, string> = {
   AIRBNB: "bg-red-50 text-red-700 border-red-200",
   VRBO: "bg-blue-50 text-blue-700 border-blue-200",
@@ -59,7 +97,10 @@ export default async function BookingDetailPage({ params }: { params: Promise<{ 
     (new Date(booking.checkOut).getTime() - new Date(booking.checkIn).getTime()) / (1000 * 60 * 60 * 24)
   );
 
-  const nightlyRates = booking.nightlyRates as { date: string; rate: number; originalRate?: number; discountPerNight?: number }[] | null;
+  const rawNightlyRates = booking.nightlyRates as { date: string; rate: number; originalRate?: number; discountPerNight?: number }[] | null;
+
+  // Expand combined entries like "2026-04-08 (4 nights)" into individual per-night rows
+  const nightlyRates = rawNightlyRates ? expandNightlyRates(rawNightlyRates, nights) : null;
   const hasDiscount = Number(booking.discountAmount) > 0 || nightlyRates?.some((nr) => nr.discountPerNight && nr.discountPerNight > 0);
 
   return (
@@ -169,7 +210,7 @@ export default async function BookingDetailPage({ params }: { params: Promise<{ 
                     return (
                       <div key={nr.date} className="flex justify-between text-xs">
                         <span className="text-[#6B7862]">
-                          {new Date(nr.date + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                          {formatRateDate(nr.date)}
                         </span>
                         {hasDiscount ? (
                           <div className="flex gap-4">

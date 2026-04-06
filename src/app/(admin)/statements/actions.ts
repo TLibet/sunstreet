@@ -87,3 +87,20 @@ export async function finalizeStatement(statementId: string) {
   revalidatePath("/statements");
   revalidatePath(`/statements/${statementId}`);
 }
+
+export async function deleteStatement(statementId: string) {
+  await prisma.$transaction(async (tx) => {
+    // Unlink snapshots from statement
+    await tx.monthlySnapshot.updateMany({
+      where: { statementId },
+      data: { statementId: null, status: "DRAFT" },
+    });
+
+    // Delete the statement
+    await tx.statement.delete({
+      where: { id: statementId },
+    });
+  });
+
+  revalidatePath("/statements");
+}
