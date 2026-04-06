@@ -56,31 +56,34 @@ function formatDate(d: Date): string {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-function getBookingRevenue(booking: any, year: number, month: number): number {
+function getBookingRevenue(booking: any, year: number, month: number): { revenue: number; isCrossMonth: boolean } {
   const checkIn = new Date(booking.checkIn);
+  const checkOut = new Date(booking.checkOut);
+  const nextMonthStart = new Date(year, month, 1);
   const isCheckInMonth = checkIn.getFullYear() === year && checkIn.getMonth() + 1 === month;
+  const endsInThisMonth = checkOut <= nextMonthStart;
+  const fullyInThisMonth = isCheckInMonth && endsInThisMonth;
 
-  if (isCheckInMonth) {
-    return Number(booking.payout);
+  if (fullyInThisMonth) {
+    return { revenue: Number(booking.payout), isCrossMonth: false };
   }
 
-  // Cross-month: only nightly rates for this month
+  // Cross-month: only nightly rates for this month's days
   const nightlyRates = booking.nightlyRates as { date: string; rate: number }[] | null;
   const monthPrefix = `${year}-${String(month).padStart(2, "0")}`;
 
   if (nightlyRates) {
-    return nightlyRates.filter((nr: any) => nr.date.startsWith(monthPrefix)).reduce((s: number, nr: any) => s + nr.rate, 0);
+    const rev = nightlyRates.filter((nr: any) => nr.date.startsWith(monthPrefix)).reduce((s: number, nr: any) => s + nr.rate, 0);
+    return { revenue: rev, isCrossMonth: true };
   }
 
-  const checkOut = new Date(booking.checkOut);
   const totalNights = Math.round((checkOut.getTime() - checkIn.getTime()) / 86400000);
   const perNight = totalNights > 0 ? Number(booking.baseAmount) / totalNights : 0;
   const mStart = new Date(year, month - 1, 1);
-  const mEnd = new Date(year, month, 1);
   const effStart = checkIn > mStart ? checkIn : mStart;
-  const effEnd = checkOut < mEnd ? checkOut : mEnd;
+  const effEnd = checkOut < nextMonthStart ? checkOut : nextMonthStart;
   const nightsInMonth = Math.max(0, Math.round((effEnd.getTime() - effStart.getTime()) / 86400000));
-  return Math.round(perNight * nightsInMonth * 100) / 100;
+  return { revenue: Math.round(perNight * nightsInMonth * 100) / 100, isCrossMonth: true };
 }
 
 function generateStatementHtml(statement: any, period: string, bookingsByUnit: Record<string, any[]>, adjustmentsByUnit: Record<string, any[]>, baseUrl: string): string {
@@ -93,19 +96,17 @@ function generateStatementHtml(statement: any, period: string, bookingsByUnit: R
       return `<tr><td style="padding-left:20px;font-style:italic;color:#6B7862">${a.description}</td><td class="money" style="${amt < 0 ? "color:#dc2626" : ""}">${amt < 0 ? "-" : ""}$${Math.abs(amt).toFixed(2)}</td></tr>`;
     }).join("");
     const bookingData = bookings.map((b: any) => {
-      const rev = getBookingRevenue(b, statement.year, statement.month);
-      const checkIn = new Date(b.checkIn);
-      const isCheckInMonth = checkIn.getFullYear() === statement.year && checkIn.getMonth() + 1 === statement.month;
-      return { b, rev, isCheckInMonth };
+      const { revenue, isCrossMonth } = getBookingRevenue(b, statement.year, statement.month);
+      return { b, revenue, isCrossMonth };
     });
-    const totalRev = bookingData.reduce((sum: number, d: any) => sum + d.rev, 0);
+    const totalRev = bookingData.reduce((sum: number, d: any) => sum + d.revenue, 0);
 
     const bookingRows = bookingData.map((d: any) => {
       return `<tr>
         <td style="font-family:monospace;font-size:11px">${d.b.channelConfirmation || "-"}</td>
         <td>${formatDate(new Date(d.b.checkIn))}</td>
         <td>${formatDate(new Date(d.b.checkOut))}</td>
-        <td class="money">$${d.rev.toFixed(2)}${!d.isCheckInMonth ? '<br><span style="font-size:9px;color:#8E9B85">nightly only</span>' : ''}</td>
+        <td class="money">$${d.revenue.toFixed(2)}${d.isCrossMonth ? '<br><span style="font-size:9px;color:#8E9B85">nightly only</span>' : ''}</td>
       </tr>`;
     }).join("");
 

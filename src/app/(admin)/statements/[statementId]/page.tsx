@@ -127,34 +127,36 @@ export default async function StatementDetailPage({
         const unitBookings = bookingsByUnit[snapshot.unitId] || [];
         const unitAdjustments = adjustmentsByUnit[snapshot.unitId] || [];
 
+        const monthStart = new Date(statement.year, statement.month - 1, 1);
+        const nextMonthStart = new Date(statement.year, statement.month, 1);
+        const monthPrefix = `${statement.year}-${String(statement.month).padStart(2, "0")}`;
+
         const bookingRows = unitBookings
           .filter((b: any) => b.source !== "OWNER_HOLD" && b.source !== "MAINTENANCE" && b.source !== "MAJOR_HOLIDAY")
           .map((b: any) => {
             const checkIn = new Date(b.checkIn);
             const checkOut = new Date(b.checkOut);
             const isCheckInMonth = checkIn.getFullYear() === statement.year && checkIn.getMonth() + 1 === statement.month;
+            const endsInThisMonth = checkOut <= nextMonthStart;
+            const fullyInThisMonth = isCheckInMonth && endsInThisMonth;
 
             let revenue: number;
-            if (isCheckInMonth) {
-              // Booking starts in this month — use full payout (includes fees)
+            if (fullyInThisMonth) {
+              // Booking starts and ends in this month — use full payout
               revenue = Number(b.payout);
             } else {
-              // Cross-month booking — only count nightly rates for days in this month
+              // Cross-month booking (either direction) — only nightly rates for this month's days
               const nightlyRates = b.nightlyRates as { date: string; rate: number }[] | null;
-              const monthPrefix = `${statement.year}-${String(statement.month).padStart(2, "0")}`;
 
               if (nightlyRates) {
                 revenue = nightlyRates
                   .filter((nr: any) => nr.date.startsWith(monthPrefix))
                   .reduce((sum: number, nr: any) => sum + nr.rate, 0);
               } else {
-                // Fallback: uniform rate for days in this month
                 const totalNights = Math.round((checkOut.getTime() - checkIn.getTime()) / 86400000);
                 const perNight = totalNights > 0 ? Number(b.baseAmount) / totalNights : 0;
-                const mStart = new Date(statement.year, statement.month - 1, 1);
-                const mEnd = new Date(statement.year, statement.month, 1);
-                const effStart = checkIn > mStart ? checkIn : mStart;
-                const effEnd = checkOut < mEnd ? checkOut : mEnd;
+                const effStart = checkIn > monthStart ? checkIn : monthStart;
+                const effEnd = checkOut < nextMonthStart ? checkOut : nextMonthStart;
                 const nightsInMonth = Math.max(0, Math.round((effEnd.getTime() - effStart.getTime()) / 86400000));
                 revenue = Math.round(perNight * nightsInMonth * 100) / 100;
               }
@@ -169,7 +171,7 @@ export default async function StatementDetailPage({
               checkOut,
               revenue,
               discountAmount: isCheckInMonth ? Number(b.discountAmount || 0) : 0,
-              isCrossMonth: !isCheckInMonth,
+              isCrossMonth: !fullyInThisMonth,
             };
           });
 
