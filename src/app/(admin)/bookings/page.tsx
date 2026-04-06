@@ -56,7 +56,7 @@ export default async function BookingsPage() {
               </thead>
               <tbody className="divide-y divide-[#E8ECE5]">
                 {bookings.map((b) => (
-                  <tr key={b.id} className="hover:bg-[#FAFAF7] transition-colors cursor-pointer" onClick={() => {}}>
+                  <tr key={b.id} className="hover:bg-[#FAFAF7] transition-colors cursor-pointer">
                     <td className="px-4 py-3">
                       <Link href={`/bookings/${b.id}`} className="font-medium text-[#C9A84C] hover:underline">{b.unit.unitNumber}</Link>
                       <p className="text-xs text-[#8E9B85]">{b.unit.owner.name}</p>
