@@ -15,7 +15,9 @@
       "Bash(gh repo:*)",
       "Bash(openssl rand:*)",
       "Bash(git rm:*)",
-      "Bash(ls node_modules/.prisma/client/libquery_engine*)"
+      "Bash(ls node_modules/.prisma/client/libquery_engine*)",
+      "Bash(export PATH=/opt/homebrew/bin:$PATH)",
+      "Bash(git log:*)"
     ]
   }
 }
