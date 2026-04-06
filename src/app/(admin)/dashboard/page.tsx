@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Building2, Users, CalendarDays } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { MgmtFeesChart } from "./mgmt-fees-chart";
+import { YearOverYearChart } from "./yoy-chart";
 
 export const dynamic = 'force-dynamic';
 
@@ -57,7 +58,27 @@ async function getStats() {
       return { month: label, fees: Math.round(total * 100) / 100 };
     });
 
-  return { ownerCount, unitCount, bookingCount, recentBookings, chartData };
+  // Year-over-year comparison: revenue by month grouped by year
+  const revenueByYearMonth: Record<string, Record<number, number>> = {};
+  for (const b of allBookings) {
+    const ci = new Date(b.checkIn);
+    const year = String(ci.getFullYear());
+    const month = ci.getMonth(); // 0-indexed
+    if (!revenueByYearMonth[year]) revenueByYearMonth[year] = {};
+    revenueByYearMonth[year][month] = (revenueByYearMonth[year][month] || 0) + Number(b.payout);
+  }
+
+  const years = Object.keys(revenueByYearMonth).sort();
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const yoyData = monthNames.map((name, i) => {
+    const row: Record<string, any> = { month: name };
+    for (const year of years) {
+      row[year] = Math.round((revenueByYearMonth[year]?.[i] || 0) * 100) / 100;
+    }
+    return row;
+  });
+
+  return { ownerCount, unitCount, bookingCount, recentBookings, chartData, yoyData, years };
 }
 
 export default async function AdminDashboard() {
@@ -93,8 +114,9 @@ export default async function AdminDashboard() {
         ))}
       </div>
 
-      {/* Mgmt Fees Chart */}
+      {/* Charts */}
       <MgmtFeesChart data={stats.chartData} />
+      <YearOverYearChart data={stats.yoyData} years={stats.years} />
 
       {/* Upcoming bookings */}
       <div>
