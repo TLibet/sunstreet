@@ -8,7 +8,7 @@ export class HospitableClient {
   private baseUrl: string;
   private pat: string;
 
-  constructor(pat?: string, baseUrl = "https://api.hospitable.com/v2") {
+  constructor(pat?: string, baseUrl = "https://public.api.hospitable.com/v2") {
     this.pat = pat || process.env.HOSPITABLE_PAT || "";
     this.baseUrl = baseUrl;
   }
