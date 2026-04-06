@@ -29,44 +29,62 @@ export async function generateUnitStatementAction(formData: FormData) {
   const month = parseInt(formData.get("month") as string);
   const year = parseInt(formData.get("year") as string);
 
-  // Get the unit's owner
   const unit = await prisma.unit.findUnique({
     where: { id: unitId },
     select: { ownerId: true },
   });
-
   if (!unit) throw new Error("Unit not found");
 
   // Generate the snapshot for this unit
   const snapshot = await generateSnapshot(unitId, year, month);
 
-  // Create or update a statement for the owner
-  const statement = await prisma.statement.upsert({
-    where: {
-      ownerId_year_month: { ownerId: unit.ownerId, year, month },
-    },
-    create: {
-      ownerId: unit.ownerId,
-      year,
-      month,
-      totalDueToOwner: Number(snapshot.netDueToOwner),
-      totalGrossIncome: Number(snapshot.grossIncome),
-      totalMgmtFees: Number(snapshot.mgmtFeeAmount),
-      status: "DRAFT",
-    },
-    update: {
-      totalDueToOwner: Number(snapshot.netDueToOwner),
-      totalGrossIncome: Number(snapshot.grossIncome),
-      totalMgmtFees: Number(snapshot.mgmtFeeAmount),
-      status: "DRAFT",
-    },
+  // Find existing statement for this owner/month or create one
+  let statement = await prisma.statement.findUnique({
+    where: { ownerId_year_month: { ownerId: unit.ownerId, year, month } },
+    include: { snapshots: true },
   });
 
-  // Link snapshot to statement
-  await prisma.monthlySnapshot.update({
-    where: { id: snapshot.id },
-    data: { statementId: statement.id },
-  });
+  if (statement) {
+    // Link this snapshot to the existing statement
+    await prisma.monthlySnapshot.update({
+      where: { id: snapshot.id },
+      data: { statementId: statement.id },
+    });
+
+    // Recalculate statement totals from all linked snapshots
+    const allSnapshots = await prisma.monthlySnapshot.findMany({
+      where: { statementId: statement.id },
+    });
+
+    await prisma.statement.update({
+      where: { id: statement.id },
+      data: {
+        totalDueToOwner: allSnapshots.reduce((s, snap) => s + Number(snap.netDueToOwner), 0),
+        totalGrossIncome: allSnapshots.reduce((s, snap) => s + Number(snap.grossIncome), 0),
+        totalMgmtFees: allSnapshots.reduce((s, snap) => s + Number(snap.mgmtFeeAmount), 0),
+        status: "DRAFT",
+      },
+    });
+  } else {
+    // Create new statement
+    statement = await prisma.statement.create({
+      data: {
+        ownerId: unit.ownerId,
+        year,
+        month,
+        totalDueToOwner: Number(snapshot.netDueToOwner),
+        totalGrossIncome: Number(snapshot.grossIncome),
+        totalMgmtFees: Number(snapshot.mgmtFeeAmount),
+        status: "DRAFT",
+      },
+      include: { snapshots: true },
+    });
+
+    await prisma.monthlySnapshot.update({
+      where: { id: snapshot.id },
+      data: { statementId: statement.id },
+    });
+  }
 
   revalidatePath("/statements");
 }
