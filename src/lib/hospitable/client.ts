@@ -44,6 +44,7 @@ export class HospitableClient {
     properties?: string[];
     start_date?: string;
     end_date?: string;
+    date_query?: string;
     include?: string;
     page?: number;
     per_page?: number;
@@ -54,6 +55,7 @@ export class HospitableClient {
 
     if (params?.start_date) url.searchParams.set("start_date", params.start_date);
     if (params?.end_date) url.searchParams.set("end_date", params.end_date);
+    if (params?.date_query) url.searchParams.set("date_query", params.date_query);
     if (params?.include) url.searchParams.set("include", params.include);
 
     // Each property UUID as a separate properties[] param

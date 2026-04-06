@@ -152,6 +152,12 @@ export async function syncReservations(options?: {
       units.map((u) => [u.hosputableListingId!, u.id])
     );
 
+    // Default to a wide date range (1 year back, 1 year forward) to get all bookings
+    // The API defaults to only 2 weeks if no date params are provided
+    const now = new Date();
+    const defaultStart = options?.startDate || `${now.getFullYear() - 1}-01-01`;
+    const defaultEnd = options?.endDate || `${now.getFullYear() + 1}-12-31`;
+
     // Fetch reservations per property (to know which unit each reservation belongs to)
     for (const unit of units) {
       let page = 1;
@@ -160,8 +166,8 @@ export async function syncReservations(options?: {
       do {
         const response = await client.getReservations({
           properties: [unit.hosputableListingId!],
-          start_date: options?.startDate,
-          end_date: options?.endDate,
+          start_date: defaultStart,
+          end_date: defaultEnd,
           include: "financials,guest",
           page,
           per_page: 50,

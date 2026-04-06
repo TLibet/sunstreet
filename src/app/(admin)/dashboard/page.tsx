@@ -11,7 +11,7 @@ async function getStats() {
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
-  const [ownerCount, unitCount, bookingCount, recentBookings, statements] = await Promise.all([
+  const [ownerCount, unitCount, bookingCount, recentBookings, allBookings, feeConfigs] = await Promise.all([
     prisma.owner.count({ where: { isActive: true } }),
     prisma.unit.count({ where: { isActive: true } }),
     prisma.booking.count({
@@ -23,17 +23,30 @@ async function getStats() {
       orderBy: { checkIn: "asc" },
       take: 8,
     }),
-    prisma.statement.findMany({
-      select: { month: true, year: true, totalMgmtFees: true },
-      orderBy: [{ year: "asc" }, { month: "asc" }],
+    prisma.booking.findMany({
+      where: { status: { not: "CANCELLED" }, source: { notIn: ["OWNER_HOLD", "MAINTENANCE", "MAJOR_HOLIDAY"] } },
+      select: { checkIn: true, payout: true, unitId: true },
+    }),
+    prisma.managementFeeConfig.findMany({
+      where: { effectiveTo: null },
+      select: { unitId: true, percentage: true },
     }),
   ]);
 
-  // Aggregate mgmt fees per month
+  // Build unit -> mgmt fee % map
+  const feeRateByUnit: Record<string, number> = {};
+  for (const fc of feeConfigs) {
+    feeRateByUnit[fc.unitId] = Number(fc.percentage);
+  }
+
+  // Aggregate mgmt fees per month from bookings
   const feesByMonth: Record<string, number> = {};
-  for (const stmt of statements) {
-    const key = `${stmt.year}-${String(stmt.month).padStart(2, "0")}`;
-    feesByMonth[key] = (feesByMonth[key] || 0) + Number(stmt.totalMgmtFees);
+  for (const b of allBookings) {
+    const ci = new Date(b.checkIn);
+    const key = `${ci.getFullYear()}-${String(ci.getMonth() + 1).padStart(2, "0")}`;
+    const rate = feeRateByUnit[b.unitId] || 0.15;
+    const fee = Number(b.payout) * rate;
+    feesByMonth[key] = (feesByMonth[key] || 0) + fee;
   }
 
   const chartData = Object.entries(feesByMonth)
