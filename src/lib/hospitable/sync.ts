@@ -62,12 +62,10 @@ function extractFinancials(reservation: any) {
     }
   }
 
-  // Host service fee
+  // Host fees (service fees, "Paid to Vrbo", etc.)
   let hostServiceFee = 0;
   for (const fee of (host.host_fees || [])) {
-    if (fee.label?.toLowerCase().includes("service")) {
-      hostServiceFee += Math.abs(centsToDecimal(fee.amount));
-    }
+    hostServiceFee += Math.abs(centsToDecimal(fee.amount));
   }
 
   // Pass-through taxes (host taxes)
