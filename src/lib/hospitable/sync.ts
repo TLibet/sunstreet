@@ -1,6 +1,5 @@
 import { prisma } from "@/lib/prisma";
 import { HospitableClient } from "./client";
-import type { HospitableReservation } from "./types";
 
 const CHANNEL_MAP: Record<string, string> = {
   airbnb: "AIRBNB",
@@ -12,11 +11,11 @@ const CHANNEL_MAP: Record<string, string> = {
 };
 
 function mapChannel(platform: string): string {
-  return CHANNEL_MAP[platform.toLowerCase()] || "OTHER";
+  return CHANNEL_MAP[platform?.toLowerCase()] || "OTHER";
 }
 
 function mapStatus(status: string): string {
-  switch (status.toLowerCase()) {
+  switch (status?.toLowerCase()) {
     case "confirmed":
     case "accepted":
       return "CONFIRMED";
@@ -32,6 +31,55 @@ function mapStatus(status: string): string {
     default:
       return "CONFIRMED";
   }
+}
+
+// Hospitable API returns amounts in cents
+function centsToDecimal(cents: number | undefined): number {
+  return cents ? cents / 100 : 0;
+}
+
+function extractFinancials(reservation: any) {
+  const fin = reservation.financials;
+  if (!fin) return { baseAmount: 0, cleaningFee: 0, hostServiceFee: 0, passThroughTax: 0, payout: 0, nightlyRates: undefined };
+
+  const host = fin.host || {};
+  const baseAmount = centsToDecimal(host.accommodation?.amount);
+
+  // Cleaning fee from guest_fees
+  let cleaningFee = 0;
+  for (const fee of (host.guest_fees || [])) {
+    if (fee.label?.toLowerCase().includes("cleaning")) {
+      cleaningFee += centsToDecimal(fee.amount);
+    }
+  }
+
+  // Host service fee
+  let hostServiceFee = 0;
+  for (const fee of (host.host_fees || [])) {
+    if (fee.label?.toLowerCase().includes("service")) {
+      hostServiceFee += Math.abs(centsToDecimal(fee.amount));
+    }
+  }
+
+  // Pass-through taxes (host taxes)
+  let passThroughTax = 0;
+  for (const tax of (host.taxes || [])) {
+    passThroughTax += centsToDecimal(tax.amount);
+  }
+
+  // Payout/revenue
+  const payout = centsToDecimal(host.revenue?.amount);
+
+  // Nightly rates from accommodation_breakdown
+  let nightlyRates: { date: string; rate: number }[] | undefined;
+  if (host.accommodation_breakdown?.length) {
+    nightlyRates = host.accommodation_breakdown.map((nb: any) => ({
+      date: nb.label, // label is the date string like "2026-04-11"
+      rate: centsToDecimal(nb.amount),
+    }));
+  }
+
+  return { baseAmount, cleaningFee, hostServiceFee, passThroughTax, payout, nightlyRates };
 }
 
 export async function syncReservations(options?: {
@@ -51,102 +99,91 @@ export async function syncReservations(options?: {
     let created = 0;
     let updated = 0;
 
-    // Step 1: Fetch all properties from Hospitable
-    const propertiesResponse = await client.getProperties({ per_page: 100 });
-    const properties = propertiesResponse.data;
-
-    // Build a map of hospitable property UUID -> our unit ID
+    // Get linked units
     const units = await prisma.unit.findMany({
       where: { hosputableListingId: { not: null } },
-      select: { id: true, hosputableListingId: true },
+      select: { id: true, unitNumber: true, hosputableListingId: true },
     });
+
+    if (units.length === 0) {
+      await prisma.syncLog.update({
+        where: { id: syncLog.id },
+        data: { status: "completed", completedAt: new Date(), details: { message: "No linked units" } as any },
+      });
+      return { created: 0, updated: 0, propertiesFound: 0 };
+    }
 
     const listingToUnitId = new Map(
       units.map((u) => [u.hosputableListingId!, u.id])
     );
 
-    // Only sync properties that are linked to units in our system
-    const allPropertyUuids = units.map((u) => u.hosputableListingId!);
+    // Fetch reservations per property (to know which unit each reservation belongs to)
+    for (const unit of units) {
+      let page = 1;
+      let lastPage = 1;
 
-    // Step 2: Fetch reservations for all properties
-    let page = 1;
-    let lastPage = 1;
-
-    do {
-      const response = await client.getReservations({
-        properties: allPropertyUuids,
-        start_date: options?.startDate,
-        end_date: options?.endDate,
-        include: "financials,guest",
-        page,
-        per_page: 50,
-      });
-
-      lastPage = response.meta.last_page;
-
-      for (const reservation of response.data) {
-        // Find matching unit
-        const unitId =
-          listingToUnitId.get(reservation.property_uuid) ||
-          listingToUnitId.get(reservation.listing_uuid);
-
-        if (!unitId) continue; // Skip if no matching unit
-
-        const bookingData = {
-          hosputableId: reservation.uuid,
-          unitId,
-          guestName: reservation.guest_name || null,
-          guestEmail: reservation.guest_email || null,
-          guestPhone: reservation.guest_phone || null,
-          numberOfGuests:
-            (reservation.adults || 0) +
-            (reservation.children || 0) +
-            (reservation.infants || 0),
-          checkIn: new Date(reservation.check_in),
-          checkOut: new Date(reservation.check_out),
-          bookedAt: reservation.booking_date
-            ? new Date(reservation.booking_date)
-            : null,
-          source: mapChannel(reservation.platform) as any,
-          channelConfirmation: reservation.booking_code || null,
-          status: mapStatus(reservation.status) as any,
-          currency: reservation.financials?.currency || "USD",
-          baseAmount: reservation.financials?.accommodation_total || 0,
-          cleaningFee: reservation.financials?.cleaning_fee || 0,
-          hostServiceFee: Math.abs(
-            reservation.financials?.host_service_fee || 0
-          ),
-          guestServiceFee: reservation.financials?.guest_service_fee || 0,
-          passThroughTax: reservation.financials?.pass_through_taxes || 0,
-          remittedTax: reservation.financials?.remitted_taxes || 0,
-          petFee: reservation.financials?.pet_fee || 0,
-          extraGuestFee: reservation.financials?.extra_guest_fee || 0,
-          securityDeposit: reservation.financials?.security_deposit || 0,
-          adjustedAmount: reservation.financials?.resolution_adjustment || 0,
-          payout: reservation.financials?.payout || 0,
-          nightlyRates: (reservation.financials?.nightly_rates as any) || undefined,
-          lastSyncedAt: new Date(),
-          rawApiData: reservation as any,
-        };
-
-        const existing = await prisma.booking.findUnique({
-          where: { hosputableId: reservation.uuid },
+      do {
+        const response = await client.getReservations({
+          properties: [unit.hosputableListingId!],
+          start_date: options?.startDate,
+          end_date: options?.endDate,
+          include: "financials,guest",
+          page,
+          per_page: 50,
         });
 
-        if (existing) {
-          await prisma.booking.update({
-            where: { hosputableId: reservation.uuid },
-            data: bookingData,
-          });
-          updated++;
-        } else {
-          await prisma.booking.create({ data: bookingData });
-          created++;
-        }
-      }
+        lastPage = response.meta.last_page;
 
-      page++;
-    } while (page <= lastPage);
+        for (const reservation of response.data) {
+          const hosputableId = reservation.id || (reservation as any).uuid;
+          if (!hosputableId) continue;
+
+          const fin = extractFinancials(reservation);
+          const guests = (reservation as any).guests || {};
+
+          const bookingData = {
+            hosputableId,
+            unitId: unit.id,
+            guestName: (reservation as any).guest?.name || (reservation as any).guest_name || null,
+            guestEmail: (reservation as any).guest?.email || (reservation as any).guest_email || null,
+            guestPhone: (reservation as any).guest?.phone || (reservation as any).guest_phone || null,
+            numberOfGuests: guests.total || guests.adult_count || 0,
+            checkIn: new Date((reservation as any).arrival_date || reservation.check_in),
+            checkOut: new Date((reservation as any).departure_date || reservation.check_out),
+            bookedAt: (reservation as any).booking_date ? new Date((reservation as any).booking_date) : null,
+            source: mapChannel(reservation.platform) as any,
+            channelConfirmation: (reservation as any).code || reservation.booking_code || null,
+            status: mapStatus((reservation as any).status) as any,
+            currency: (reservation as any).financials?.currency || "USD",
+            baseAmount: fin.baseAmount,
+            cleaningFee: fin.cleaningFee,
+            hostServiceFee: fin.hostServiceFee,
+            passThroughTax: fin.passThroughTax,
+            payout: fin.payout,
+            nightlyRates: fin.nightlyRates ? (fin.nightlyRates as any) : undefined,
+            lastSyncedAt: new Date(),
+            rawApiData: reservation as any,
+          };
+
+          const existing = await prisma.booking.findUnique({
+            where: { hosputableId },
+          });
+
+          if (existing) {
+            await prisma.booking.update({
+              where: { hosputableId },
+              data: bookingData,
+            });
+            updated++;
+          } else {
+            await prisma.booking.create({ data: bookingData });
+            created++;
+          }
+        }
+
+        page++;
+      } while (page <= lastPage);
+    }
 
     await prisma.syncLog.update({
       where: { id: syncLog.id },
@@ -155,15 +192,10 @@ export async function syncReservations(options?: {
         completedAt: new Date(),
         recordsCreated: created,
         recordsUpdated: updated,
-        details: {
-          propertiesFound: properties.length,
-          linkedUnits: units.length,
-          propertyUuids: allPropertyUuids,
-        } as any,
       },
     });
 
-    return { created, updated, propertiesFound: properties.length };
+    return { created, updated, propertiesFound: units.length };
   } catch (error) {
     await prisma.syncLog.update({
       where: { id: syncLog.id },
