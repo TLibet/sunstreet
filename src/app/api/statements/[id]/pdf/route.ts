@@ -92,19 +92,26 @@ function generateStatementHtml(statement: any, period: string, bookingsByUnit: R
       const amt = Number(a.amount);
       return `<tr><td style="padding-left:20px;font-style:italic;color:#6B7862">${a.description}</td><td class="money" style="${amt < 0 ? "color:#dc2626" : ""}">${amt < 0 ? "-" : ""}$${Math.abs(amt).toFixed(2)}</td></tr>`;
     }).join("");
-    const bookingRows = bookings.map((b: any) => {
+    const bookingData = bookings.map((b: any) => {
       const rev = getBookingRevenue(b, statement.year, statement.month);
       const checkIn = new Date(b.checkIn);
-      const isCrossMonth = !(checkIn.getFullYear() === statement.year && checkIn.getMonth() + 1 === statement.month);
+      const isCheckInMonth = checkIn.getFullYear() === statement.year && checkIn.getMonth() + 1 === statement.month;
+      const discount = isCheckInMonth ? Number(b.discountAmount || 0) : 0;
+      return { b, rev, isCheckInMonth, discount };
+    });
+    const totalRev = bookingData.reduce((sum: number, d: any) => sum + d.rev, 0);
+    const totalDiscount = bookingData.reduce((sum: number, d: any) => sum + d.discount, 0);
+    const hasDiscount = totalDiscount > 0;
+
+    const bookingRows = bookingData.map((d: any) => {
       return `<tr>
-        <td style="font-family:monospace;font-size:11px">${b.channelConfirmation || "-"}</td>
-        <td>${formatDate(new Date(b.checkIn))}</td>
-        <td>${formatDate(new Date(b.checkOut))}</td>
-        <td class="money">$${rev.toFixed(2)}${isCrossMonth ? '<br><span style="font-size:9px;color:#8E9B85">nightly only</span>' : ''}</td>
+        <td style="font-family:monospace;font-size:11px">${d.b.channelConfirmation || "-"}</td>
+        <td>${formatDate(new Date(d.b.checkIn))}</td>
+        <td>${formatDate(new Date(d.b.checkOut))}</td>
+        ${hasDiscount ? `<td class="money" style="color:#16a34a;font-size:11px">${d.discount > 0 ? '-$' + d.discount.toFixed(2) : ''}</td>` : ''}
+        <td class="money">$${d.rev.toFixed(2)}${!d.isCheckInMonth ? '<br><span style="font-size:9px;color:#8E9B85">nightly only</span>' : ''}</td>
       </tr>`;
     }).join("");
-
-    const totalRev = bookings.reduce((sum: number, b: any) => sum + getBookingRevenue(b, statement.year, statement.month), 0);
 
     return `
       <div class="unit-section">
@@ -120,11 +127,11 @@ function generateStatementHtml(statement: any, period: string, bookingsByUnit: R
         <h4>Bookings</h4>
         <table class="bookings-table">
           <thead>
-            <tr><th>Confirmation</th><th>Check-in</th><th>Check-out</th><th style="text-align:right">Revenue</th></tr>
+            <tr><th>Confirmation</th><th>Check-in</th><th>Check-out</th>${hasDiscount ? '<th style="text-align:right">Discount</th>' : ''}<th style="text-align:right">Revenue</th></tr>
           </thead>
           <tbody>
             ${bookingRows}
-            <tr class="total-row"><td colspan="3" style="text-align:right;font-weight:bold">Gross Revenue</td><td class="money" style="font-weight:bold">$${totalRev.toFixed(2)}</td></tr>
+            <tr class="total-row"><td colspan="3" style="text-align:right;font-weight:bold">${hasDiscount ? '' : 'Gross Revenue'}</td>${hasDiscount ? `<td class="money" style="font-weight:bold;color:#16a34a">-$${totalDiscount.toFixed(2)}</td>` : ''}<td class="money" style="font-weight:bold">$${totalRev.toFixed(2)}</td></tr>
           </tbody>
         </table>
         ` : ""}
