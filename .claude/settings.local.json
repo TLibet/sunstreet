@@ -10,7 +10,10 @@
       "Bash(npx shadcn@latest add card table input label dialog select badge separator dropdown-menu avatar sheet tabs textarea popover command sidebar -y)",
       "Bash(npm run:*)",
       "Bash(grep -l \"export.*PrismaClient\" /Users/toddlibet/Documents/Claude/Projects/sunstreet/src/generated/prisma/*.ts)",
-      "mcp__Claude_Preview__preview_start"
+      "mcp__Claude_Preview__preview_start",
+      "Bash(git remote:*)",
+      "Bash(gh repo:*)",
+      "Bash(openssl rand:*)"
     ]
   }
 }

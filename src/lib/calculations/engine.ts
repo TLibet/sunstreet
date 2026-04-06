@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import type { Booking, Adjustment } from "@/generated/prisma/client";
+import type { Booking, Adjustment } from "@prisma/client";
 import type { NightlyRate, CalculationLog, CalculationStep } from "@/types";
 
 type MonthlySnapshotData = {

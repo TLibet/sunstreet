@@ -1,7 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { AdjustmentCategory } from "@/generated/prisma/client";
+import { AdjustmentCategory } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 

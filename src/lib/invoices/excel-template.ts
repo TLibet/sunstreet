@@ -1,5 +1,5 @@
 import ExcelJS from "exceljs";
-import type { Statement, MonthlySnapshot, Unit, Owner } from "@/generated/prisma/client";
+import type { Statement, MonthlySnapshot, Unit, Owner } from "@prisma/client";
 
 type SnapshotWithUnit = MonthlySnapshot & { unit: Pick<Unit, "unitNumber" | "name"> };
 type StatementWithRelations = Statement & {
