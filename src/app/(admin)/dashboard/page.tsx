@@ -1,7 +1,8 @@
 import { prisma } from "@/lib/prisma";
-import { Card, CardContent } from "@/components/ui/card";
-import { Building2, Users, CalendarDays, DollarSign } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Building2, Users, CalendarDays } from "lucide-react";
 import { auth } from "@/lib/auth";
+import { MgmtFeesChart } from "./mgmt-fees-chart";
 
 export const dynamic = 'force-dynamic';
 
@@ -10,7 +11,7 @@ async function getStats() {
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
-  const [ownerCount, unitCount, bookingCount, recentBookings] = await Promise.all([
+  const [ownerCount, unitCount, bookingCount, recentBookings, statements] = await Promise.all([
     prisma.owner.count({ where: { isActive: true } }),
     prisma.unit.count({ where: { isActive: true } }),
     prisma.booking.count({
@@ -22,9 +23,28 @@ async function getStats() {
       orderBy: { checkIn: "asc" },
       take: 8,
     }),
+    prisma.statement.findMany({
+      select: { month: true, year: true, totalMgmtFees: true },
+      orderBy: [{ year: "asc" }, { month: "asc" }],
+    }),
   ]);
 
-  return { ownerCount, unitCount, bookingCount, recentBookings };
+  // Aggregate mgmt fees per month
+  const feesByMonth: Record<string, number> = {};
+  for (const stmt of statements) {
+    const key = `${stmt.year}-${String(stmt.month).padStart(2, "0")}`;
+    feesByMonth[key] = (feesByMonth[key] || 0) + Number(stmt.totalMgmtFees);
+  }
+
+  const chartData = Object.entries(feesByMonth)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, total]) => {
+      const [y, m] = key.split("-");
+      const label = new Date(Number(y), Number(m) - 1).toLocaleDateString("en-US", { month: "short", year: "2-digit" });
+      return { month: label, fees: Math.round(total * 100) / 100 };
+    });
+
+  return { ownerCount, unitCount, bookingCount, recentBookings, chartData };
 }
 
 export default async function AdminDashboard() {
@@ -35,7 +55,6 @@ export default async function AdminDashboard() {
     { label: "Active Owners", value: stats.ownerCount, icon: Users, color: "border-[#C9A84C]" },
     { label: "Active Units", value: stats.unitCount, icon: Building2, color: "border-[#7D8B73]" },
     { label: "Bookings This Month", value: stats.bookingCount, icon: CalendarDays, color: "border-[#C9A84C]" },
-    { label: "Revenue", value: "$0", icon: DollarSign, color: "border-[#7D8B73]", sub: "Generate statements to calculate" },
   ];
 
   return (
@@ -45,7 +64,7 @@ export default async function AdminDashboard() {
         <p className="text-sm text-[#6B7862] mt-1">Here is an overview of your rental portfolio.</p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-3">
         {statCards.map((card) => (
           <Card key={card.label} className={`border-l-4 ${card.color}`}>
             <CardContent className="pt-6">
@@ -53,7 +72,6 @@ export default async function AdminDashboard() {
                 <div>
                   <p className="text-sm font-medium text-[#6B7862]">{card.label}</p>
                   <p className="text-3xl font-bold text-[#2D3028] mt-1">{card.value}</p>
-                  {card.sub && <p className="text-xs text-[#8E9B85] mt-1">{card.sub}</p>}
                 </div>
                 <card.icon className="h-8 w-8 text-[#C9A84C]/40" />
               </div>
@@ -61,6 +79,9 @@ export default async function AdminDashboard() {
           </Card>
         ))}
       </div>
+
+      {/* Mgmt Fees Chart */}
+      <MgmtFeesChart data={stats.chartData} />
 
       {/* Upcoming bookings */}
       <div>
