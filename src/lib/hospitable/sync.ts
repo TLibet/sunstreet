@@ -105,7 +105,16 @@ function extractFinancials(reservation: any) {
     });
   }
 
-  return { baseAmount, cleaningFee, hostServiceFee, passThroughTax, discountAmount, payout, nightlyRates };
+  // Adjustments from API (resolution center, etc.)
+  let adjustedAmount = 0;
+  const apiAdjustments: { label: string; amount: number }[] = [];
+  for (const adj of (host.adjustments || [])) {
+    const amt = centsToDecimal(adj.amount);
+    adjustedAmount += amt;
+    apiAdjustments.push({ label: adj.label || "Adjustment", amount: amt });
+  }
+
+  return { baseAmount, cleaningFee, hostServiceFee, passThroughTax, discountAmount, adjustedAmount, apiAdjustments, payout, nightlyRates };
 }
 
 export async function syncReservations(options?: {
@@ -186,6 +195,7 @@ export async function syncReservations(options?: {
             hostServiceFee: fin.hostServiceFee,
             passThroughTax: fin.passThroughTax,
             discountAmount: fin.discountAmount,
+            adjustedAmount: fin.adjustedAmount,
             payout: fin.payout,
             nightlyRates: fin.nightlyRates ? (fin.nightlyRates as any) : undefined,
             lastSyncedAt: new Date(),
@@ -196,15 +206,45 @@ export async function syncReservations(options?: {
             where: { hosputableId },
           });
 
+          let bookingRecord;
           if (existing) {
-            await prisma.booking.update({
+            bookingRecord = await prisma.booking.update({
               where: { hosputableId },
               data: bookingData,
             });
             updated++;
           } else {
-            await prisma.booking.create({ data: bookingData });
+            bookingRecord = await prisma.booking.create({ data: bookingData });
             created++;
+          }
+
+          // Auto-create Adjustment records from API adjustments
+          if (fin.apiAdjustments && fin.apiAdjustments.length > 0) {
+            const checkInDate = new Date((reservation as any).arrival_date || reservation.check_in);
+            const adjMonth = checkInDate.getMonth() + 1;
+            const adjYear = checkInDate.getFullYear();
+
+            for (const apiAdj of fin.apiAdjustments) {
+              // Upsert by a deterministic ID based on booking + label
+              const adjId = `api-${hosputableId}-${apiAdj.label.replace(/\s+/g, "-").toLowerCase()}`;
+              await prisma.adjustment.upsert({
+                where: { id: adjId },
+                create: {
+                  id: adjId,
+                  unitId: unit.id,
+                  month: adjMonth,
+                  year: adjYear,
+                  category: "ADJUSTED_AMOUNT",
+                  description: `${apiAdj.label} (${(reservation as any).code || hosputableId})`,
+                  amount: apiAdj.amount,
+                  createdBy: "hospitable-sync",
+                },
+                update: {
+                  amount: apiAdj.amount,
+                  description: `${apiAdj.label} (${(reservation as any).code || hosputableId})`,
+                },
+              });
+            }
           }
         }
 

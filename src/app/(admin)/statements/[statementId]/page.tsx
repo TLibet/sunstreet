@@ -24,8 +24,9 @@ async function getStatement(id: string) {
   });
   if (!statement) return null;
 
-  // Fetch bookings for each unit in this statement's month
+  // Fetch bookings and adjustments for each unit in this statement's month
   const bookingsByUnit: Record<string, any[]> = {};
+  const adjustmentsByUnit: Record<string, any[]> = {};
   const monthStart = new Date(statement.year, statement.month - 1, 1);
   const monthEnd = new Date(statement.year, statement.month, 0);
 
@@ -39,9 +40,17 @@ async function getStatement(id: string) {
       },
       orderBy: { checkIn: "asc" },
     });
+    adjustmentsByUnit[snapshot.unitId] = await prisma.adjustment.findMany({
+      where: {
+        unitId: snapshot.unitId,
+        year: statement.year,
+        month: statement.month,
+      },
+      orderBy: { createdAt: "asc" },
+    });
   }
 
-  return { statement, bookingsByUnit };
+  return { statement, bookingsByUnit, adjustmentsByUnit };
 }
 
 function SummaryRow({ label, value, bold, negative }: { label: string; value: number; bold?: boolean; negative?: boolean }) {
@@ -71,7 +80,7 @@ export default async function StatementDetailPage({
   const { statementId } = await params;
   const result = await getStatement(statementId);
   if (!result) notFound();
-  const { statement, bookingsByUnit } = result;
+  const { statement, bookingsByUnit, adjustmentsByUnit } = result;
 
   const period = new Date(statement.year, statement.month - 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
 
@@ -116,9 +125,7 @@ export default async function StatementDetailPage({
       {/* Per-unit breakdown */}
       {statement.snapshots.map((snapshot) => {
         const unitBookings = bookingsByUnit[snapshot.unitId] || [];
-        // Calculate per-booking net revenue (base amount for days in this month)
-        const monthStart = new Date(statement.year, statement.month - 1, 1);
-        const monthEnd = new Date(statement.year, statement.month, 0);
+        const unitAdjustments = adjustmentsByUnit[snapshot.unitId] || [];
 
         const bookingRows = unitBookings
           .filter((b: any) => b.source !== "OWNER_HOLD" && b.source !== "MAINTENANCE" && b.source !== "MAJOR_HOLIDAY")
@@ -202,7 +209,26 @@ export default async function StatementDetailPage({
               {/* Financial summary */}
               <div className="space-y-1">
                 <SummaryRow label="Monthly Total (for commission)" value={Number(snapshot.monthlyTotal)} bold />
-                <SummaryRow label="Adjusted Amounts" value={Number(snapshot.adjustedAmounts)} />
+
+                {/* Itemized adjustments */}
+                {unitAdjustments.filter((a: any) => a.category === "ADJUSTED_AMOUNT").length > 0 && (
+                  <div className="ml-4 space-y-0.5">
+                    {unitAdjustments
+                      .filter((a: any) => a.category === "ADJUSTED_AMOUNT")
+                      .map((a: any) => (
+                        <div key={a.id} className="flex justify-between py-0.5 text-sm">
+                          <span className="text-[#8E9B85] italic">{a.description}</span>
+                          <span className={`font-mono ${Number(a.amount) < 0 ? "text-red-600" : "text-[#2D3028]"}`}>
+                            {Number(a.amount) < 0 ? `-$${Math.abs(Number(a.amount)).toFixed(2)}` : `$${Number(a.amount).toFixed(2)}`}
+                          </span>
+                        </div>
+                      ))}
+                  </div>
+                )}
+                {Number(snapshot.adjustedAmounts) !== 0 && unitAdjustments.filter((a: any) => a.category === "ADJUSTED_AMOUNT").length === 0 && (
+                  <SummaryRow label="Adjusted Amounts" value={Number(snapshot.adjustedAmounts)} />
+                )}
+
                 <SummaryRow label="Cancellation Income" value={Number(snapshot.cancellationIncome)} />
               </div>
 

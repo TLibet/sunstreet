@@ -26,6 +26,8 @@ export async function GET(
   const monthStart = new Date(statement.year, statement.month - 1, 1);
   const monthEnd = new Date(statement.year, statement.month, 0);
 
+  const adjustmentsByUnit: Record<string, any[]> = {};
+
   for (const snapshot of statement.snapshots) {
     bookingsByUnit[snapshot.unitId] = await prisma.booking.findMany({
       where: {
@@ -37,11 +39,15 @@ export async function GET(
       },
       orderBy: { checkIn: "asc" },
     });
+    adjustmentsByUnit[snapshot.unitId] = await prisma.adjustment.findMany({
+      where: { unitId: snapshot.unitId, year: statement.year, month: statement.month },
+      orderBy: { createdAt: "asc" },
+    });
   }
 
   const period = new Date(statement.year, statement.month - 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
   const baseUrl = request.nextUrl.origin;
-  const html = generateStatementHtml(statement, period, bookingsByUnit, baseUrl);
+  const html = generateStatementHtml(statement, period, bookingsByUnit, adjustmentsByUnit, baseUrl);
 
   return new NextResponse(html, { headers: { "Content-Type": "text/html" } });
 }
@@ -54,9 +60,15 @@ function getBookingRevenue(booking: any): number {
   return Number(booking.payout);
 }
 
-function generateStatementHtml(statement: any, period: string, bookingsByUnit: Record<string, any[]>, baseUrl: string): string {
+function generateStatementHtml(statement: any, period: string, bookingsByUnit: Record<string, any[]>, adjustmentsByUnit: Record<string, any[]>, baseUrl: string): string {
   const snapshotSections = statement.snapshots.map((s: any) => {
     const bookings = bookingsByUnit[s.unitId] || [];
+    const adjustments = adjustmentsByUnit[s.unitId] || [];
+    const adjItems = adjustments.filter((a: any) => a.category === "ADJUSTED_AMOUNT");
+    const adjItemsHtml = adjItems.map((a: any) => {
+      const amt = Number(a.amount);
+      return `<tr><td style="padding-left:20px;font-style:italic;color:#6B7862">${a.description}</td><td class="money" style="${amt < 0 ? "color:#dc2626" : ""}">${amt < 0 ? "-" : ""}$${Math.abs(amt).toFixed(2)}</td></tr>`;
+    }).join("");
     const bookingRows = bookings.map((b: any) => {
       const rev = getBookingRevenue(b);
       return `<tr>
@@ -95,7 +107,7 @@ function generateStatementHtml(statement: any, period: string, bookingsByUnit: R
         <h4>Financial Summary</h4>
         <table>
           <tr><td><strong>Monthly Total (for commission)</strong></td><td class="money"><strong>$${Number(s.monthlyTotal).toFixed(2)}</strong></td></tr>
-          <tr><td>Adjusted Amounts</td><td class="money">$${Number(s.adjustedAmounts).toFixed(2)}</td></tr>
+          ${adjItems.length > 0 ? adjItemsHtml : (Number(s.adjustedAmounts) !== 0 ? `<tr><td>Adjusted Amounts</td><td class="money">$${Number(s.adjustedAmounts).toFixed(2)}</td></tr>` : "")}
           <tr><td>Cancellation Income</td><td class="money">$${Number(s.cancellationIncome).toFixed(2)}</td></tr>
           <tr class="separator"><td colspan="2"><hr></td></tr>
           <tr><td>Mgmt Fee (${(Number(s.mgmtFeePercentage) * 100).toFixed(0)}%)</td><td class="money negative">-$${Number(s.mgmtFeeAmount).toFixed(2)}</td></tr>
