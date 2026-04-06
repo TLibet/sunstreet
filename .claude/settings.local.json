@@ -13,7 +13,9 @@
       "mcp__Claude_Preview__preview_start",
       "Bash(git remote:*)",
       "Bash(gh repo:*)",
-      "Bash(openssl rand:*)"
+      "Bash(openssl rand:*)",
+      "Bash(git rm:*)",
+      "Bash(ls node_modules/.prisma/client/libquery_engine*)"
     ]
   }
 }
