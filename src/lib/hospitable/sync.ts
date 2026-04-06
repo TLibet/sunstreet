@@ -33,6 +33,15 @@ function mapStatus(status: string): string {
   }
 }
 
+function buildGuestName(reservation: any): string | null {
+  const guest = reservation.guest;
+  if (!guest) return null;
+  const first = guest.first_name || "";
+  const last = guest.last_name || "";
+  const full = `${first} ${last}`.trim();
+  return full || guest.name || null;
+}
+
 // Hospitable API returns amounts in cents
 function centsToDecimal(cents: number | undefined): number {
   return cents ? cents / 100 : 0;
@@ -163,9 +172,9 @@ export async function syncReservations(options?: {
           const bookingData = {
             hosputableId,
             unitId: unit.id,
-            guestName: (reservation as any).guest?.name || (reservation as any).guest_name || null,
-            guestEmail: (reservation as any).guest?.email || (reservation as any).guest_email || null,
-            guestPhone: (reservation as any).guest?.phone || (reservation as any).guest_phone || null,
+            guestName: buildGuestName(reservation) || null,
+            guestEmail: (reservation as any).guest?.email || null,
+            guestPhone: (reservation as any).guest?.phone_numbers?.[0] || (reservation as any).guest?.phone || null,
             numberOfGuests: guests.total || guests.adult_count || 0,
             checkIn: new Date((reservation as any).arrival_date || reservation.check_in),
             checkOut: new Date((reservation as any).departure_date || reservation.check_out),
