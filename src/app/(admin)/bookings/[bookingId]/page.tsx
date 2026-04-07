@@ -116,6 +116,9 @@ export default async function BookingDetailPage({ params }: { params: Promise<{ 
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold text-[#2D3028]">{booking.guestName || "Guest"}</h1>
             <Badge className={SOURCE_STYLE[booking.source]}>{booking.source}</Badge>
+            {booking.isSpecialOffer && (
+              <Badge className="bg-amber-50 text-amber-700 border-amber-200">Special Offer</Badge>
+            )}
             <Badge variant={booking.status === "CONFIRMED" ? "default" : booking.status === "CANCELLED" ? "destructive" : "secondary"}>
               {booking.status}
             </Badge>
@@ -255,6 +258,13 @@ export default async function BookingDetailPage({ params }: { params: Promise<{ 
             <Separator className="my-3" />
 
             <FinancialRow label="Cleaning Fee" value={Number(booking.cleaningFee)} />
+            {booking.isSpecialOffer && (
+              <div className="rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-800 mb-1">
+                <strong>Special Offer:</strong> This booking was a special offer with no separate cleaning fee.
+                The default cleaning fee (${Number(booking.cleaningFee).toFixed(2)}) has been subtracted from the total,
+                and the remaining amount spread as nightly rates for commission calculation.
+              </div>
+            )}
             <FinancialRow label="Host Service Fee" value={Number(booking.hostServiceFee)} negative />
             <FinancialRow label="Pass-Through Tax" value={Number(booking.passThroughTax)} />
             <FinancialRow label="Guest Service Fee" value={Number(booking.guestServiceFee)} />

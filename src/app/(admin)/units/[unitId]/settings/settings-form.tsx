@@ -13,16 +13,20 @@ export function UnitSettingsForm({
   unitId,
   currentOwnerId,
   currentFee,
+  currentCleaningFee,
   owners,
 }: {
   unitId: string;
   currentOwnerId: string;
   currentFee: string;
+  currentCleaningFee: string;
   owners: Owner[];
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [newFee, setNewFee] = useState("");
+  const [cleaningFee, setCleaningFee] = useState(currentCleaningFee);
+  const [cleaningSaved, setCleaningSaved] = useState(false);
   const [selectedOwner, setSelectedOwner] = useState(currentOwnerId);
   const [ownerSaved, setOwnerSaved] = useState(false);
 
@@ -57,6 +61,24 @@ export function UnitSettingsForm({
 
     if (res.ok) {
       setOwnerSaved(true);
+      router.refresh();
+    }
+    setLoading(false);
+  }
+
+  async function handleUpdateCleaningFee(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    setCleaningSaved(false);
+
+    const res = await fetch(`/api/units/${unitId}/cleaning-fee`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cleaningFee: parseFloat(cleaningFee) }),
+    });
+
+    if (res.ok) {
+      setCleaningSaved(true);
       router.refresh();
     }
     setLoading(false);
@@ -133,6 +155,47 @@ export function UnitSettingsForm({
             >
               {loading ? "Updating..." : "Update Fee"}
             </Button>
+          </form>
+        </CardContent>
+      </Card>
+
+      {/* Default Cleaning Fee */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base text-[#2D3028]">Default Cleaning Fee</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleUpdateCleaningFee} className="space-y-4">
+            <div className="space-y-2">
+              <Label className="text-[#6B7862]">Cleaning Fee Amount</Label>
+              <div className="flex items-center gap-2">
+                <span className="text-[#8E9B85]">$</span>
+                <Input
+                  type="number"
+                  step="0.01"
+                  placeholder="250.00"
+                  value={cleaningFee}
+                  onChange={(e) => { setCleaningFee(e.target.value); setCleaningSaved(false); }}
+                  className="w-40 border-[#E2DED6] focus:border-[#C9A84C] focus:ring-[#C9A84C]"
+                />
+              </div>
+              <p className="text-xs text-[#8E9B85]">
+                Used to detect Special Offer bookings. When a booking has no cleaning fee, it is treated as a Special Offer
+                and this amount is subtracted from the total before calculating nightly rates.
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <Button
+                type="submit"
+                className="bg-[#C9A84C] hover:bg-[#B8963A] text-white"
+                disabled={loading || !cleaningFee}
+              >
+                {loading ? "Saving..." : "Update Cleaning Fee"}
+              </Button>
+              {cleaningSaved && (
+                <span className="text-sm text-green-600">Cleaning fee updated</span>
+              )}
+            </div>
           </form>
         </CardContent>
       </Card>

@@ -54,6 +54,7 @@ model Unit {
   name                 String
   address              String?
   hosputableListingId  String?  @unique
+  defaultCleaningFee   Decimal? @db.Decimal(10, 2)
   ownerId              String
   owner                Owner    @relation(fields: [ownerId], references: [id])
   isActive             Boolean  @default(true)
@@ -109,6 +110,7 @@ model Booking {
 
   // Status
   status              BookingStatus @default(CONFIRMED)
+  isSpecialOffer      Boolean       @default(false)
 
   // Financials
   currency            String        @default("USD")

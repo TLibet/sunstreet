@@ -54,6 +54,7 @@ export default async function UnitSettingsPage({
         unitId={unitId}
         currentOwnerId={unit.ownerId}
         currentFee={currentFee}
+        currentCleaningFee={unit.defaultCleaningFee ? Number(unit.defaultCleaningFee).toFixed(2) : ""}
         owners={owners}
       />
     </div>

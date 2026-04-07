@@ -74,13 +74,9 @@ function extractFinancials(reservation: any) {
     passThroughTax += centsToDecimal(tax.amount);
   }
 
-  // Discounts - check both host and guest sections
+  // Discounts - use host discounts only (guest discounts are the same values duplicated)
   let discountAmount = 0;
-  const guest = fin.guest || {};
   for (const disc of (host.discounts || [])) {
-    discountAmount += Math.abs(centsToDecimal(disc.amount));
-  }
-  for (const disc of (guest.discounts || [])) {
     discountAmount += Math.abs(centsToDecimal(disc.amount));
   }
 
@@ -134,10 +130,10 @@ export async function syncReservations(options?: {
     let created = 0;
     let updated = 0;
 
-    // Get linked units
+    // Get linked units with their default cleaning fees
     const units = await prisma.unit.findMany({
       where: { hosputableListingId: { not: null } },
-      select: { id: true, unitNumber: true, hosputableListingId: true },
+      select: { id: true, unitNumber: true, hosputableListingId: true, defaultCleaningFee: true },
     });
 
     if (units.length === 0) {
@@ -182,6 +178,42 @@ export async function syncReservations(options?: {
           const fin = extractFinancials(reservation);
           const guests = (reservation as any).guests || {};
 
+          // Detect Special Offer: no cleaning fee + unit has a default cleaning fee
+          const defaultCleaningFee = unit.defaultCleaningFee ? Number(unit.defaultCleaningFee) : 0;
+          const isSpecialOffer = fin.cleaningFee === 0 && defaultCleaningFee > 0 && fin.baseAmount > 0;
+
+          // For special offers, recalculate: subtract default cleaning fee from base amount
+          // and spread the remainder as nightly rates
+          let adjustedBaseAmount = fin.baseAmount;
+          let adjustedNightlyRates = fin.nightlyRates;
+          let impliedCleaningFee = 0;
+
+          if (isSpecialOffer) {
+            impliedCleaningFee = defaultCleaningFee;
+            adjustedBaseAmount = fin.baseAmount - defaultCleaningFee;
+
+            // Recalculate nightly rates from the adjusted base amount
+            const checkInDate = new Date((reservation as any).arrival_date || reservation.check_in);
+            const checkOutDate = new Date((reservation as any).departure_date || reservation.check_out);
+            const totalNights = Math.round((checkOutDate.getTime() - checkInDate.getTime()) / 86400000);
+
+            if (totalNights > 0) {
+              const perNight = Math.round((adjustedBaseAmount / totalNights) * 100) / 100;
+              const rates: { date: string; rate: number; originalRate: number; discountPerNight: number }[] = [];
+              for (let i = 0; i < totalNights; i++) {
+                const d = new Date(checkInDate);
+                d.setDate(d.getDate() + i);
+                rates.push({
+                  date: d.toISOString().split("T")[0],
+                  rate: perNight,
+                  originalRate: perNight,
+                  discountPerNight: 0,
+                });
+              }
+              adjustedNightlyRates = rates;
+            }
+          }
+
           const bookingData = {
             hosputableId,
             unitId: unit.id,
@@ -195,15 +227,16 @@ export async function syncReservations(options?: {
             source: mapChannel(reservation.platform) as any,
             channelConfirmation: (reservation as any).code || reservation.booking_code || null,
             status: mapStatus((reservation as any).status) as any,
+            isSpecialOffer,
             currency: (reservation as any).financials?.currency || "USD",
-            baseAmount: fin.baseAmount,
-            cleaningFee: fin.cleaningFee,
+            baseAmount: isSpecialOffer ? adjustedBaseAmount : fin.baseAmount,
+            cleaningFee: isSpecialOffer ? impliedCleaningFee : fin.cleaningFee,
             hostServiceFee: fin.hostServiceFee,
             passThroughTax: fin.passThroughTax,
             discountAmount: fin.discountAmount,
             adjustedAmount: fin.adjustedAmount,
             payout: fin.payout,
-            nightlyRates: fin.nightlyRates ? (fin.nightlyRates as any) : undefined,
+            nightlyRates: adjustedNightlyRates ? (adjustedNightlyRates as any) : undefined,
             lastSyncedAt: new Date(),
             rawApiData: reservation as any,
           };
