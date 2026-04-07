@@ -91,7 +91,7 @@ export default async function UnitDetailPage({
           <CardTitle>Booking Calendar</CardTitle>
         </CardHeader>
         <CardContent>
-          <BookingCalendar unitId={unit.id} bookings={calendarBookings} />
+          <BookingCalendar unitId={unit.id} bookings={calendarBookings} mgmtFeePercentage={currentFee ? Number(currentFee.percentage) : 0.15} />
         </CardContent>
       </Card>
 

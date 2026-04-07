@@ -110,6 +110,7 @@ function buildCalendarDays(
 type Props = {
   unitId: string;
   bookings: CalendarBooking[];
+  mgmtFeePercentage?: number;
   initialMonth?: number;
   initialYear?: number;
 };
@@ -117,6 +118,7 @@ type Props = {
 export function BookingCalendar({
   unitId,
   bookings,
+  mgmtFeePercentage = 0.15,
   initialMonth,
   initialYear,
 }: Props) {
@@ -239,18 +241,22 @@ export function BookingCalendar({
       </div>
 
       {/* Summary */}
-      <div className="grid grid-cols-3 gap-4 rounded-lg border p-4 bg-white">
+      <div className="grid grid-cols-4 gap-4 rounded-lg border p-4 bg-white">
         <div>
-          <p className="text-xs text-gray-500">Booked Nights</p>
-          <p className="text-lg font-bold">{bookedDays.length}</p>
+          <p className="text-xs text-[#8E9B85]">Booked Nights</p>
+          <p className="text-lg font-bold text-[#2D3028]">{bookedDays.length}</p>
         </div>
         <div>
-          <p className="text-xs text-gray-500">Monthly Total</p>
-          <p className="text-lg font-bold">${totalRevenue.toFixed(2)}</p>
+          <p className="text-xs text-[#8E9B85]">Monthly Total</p>
+          <p className="text-lg font-bold text-[#2D3028]">${totalRevenue.toFixed(2)}</p>
         </div>
         <div>
-          <p className="text-xs text-gray-500">Nightly Average</p>
-          <p className="text-lg font-bold">${avgNightly.toFixed(2)}</p>
+          <p className="text-xs text-[#8E9B85]">Nightly Average</p>
+          <p className="text-lg font-bold text-[#2D3028]">${avgNightly.toFixed(2)}</p>
+        </div>
+        <div>
+          <p className="text-xs text-[#8E9B85]">Mgmt Fees ({(mgmtFeePercentage * 100).toFixed(0)}%)</p>
+          <p className="text-lg font-bold text-[#C9A84C]">${(totalRevenue * mgmtFeePercentage).toFixed(2)}</p>
         </div>
       </div>
     </div>
