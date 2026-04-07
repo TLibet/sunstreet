@@ -3,65 +3,48 @@ import { prisma } from "@/lib/prisma";
 
 export async function GET(request: NextRequest) {
   const propId = request.nextUrl.searchParams.get("property");
-  const all = request.nextUrl.searchParams.get("all");
+  const testParams = request.nextUrl.searchParams.get("test-params");
 
-  // If "all" param, check all linked units and count API results
-  if (all) {
-    const units = await prisma.unit.findMany({
-      where: { hosputableListingId: { not: null } },
-      select: { id: true, unitNumber: true, hosputableListingId: true },
-    });
+  // Test different date parameter names
+  if (testParams && propId) {
+    const paramSets = [
+      { name: "no params", params: {} },
+      { name: "checkin_start/end (3 months)", params: { checkin_start: "2026-04-01", checkin_end: "2026-07-31" } },
+      { name: "start_date/end_date (3 months)", params: { start_date: "2026-04-01", end_date: "2026-07-31" } },
+      { name: "from/to", params: { from: "2026-04-01", to: "2026-07-31" } },
+      { name: "date_from/date_to", params: { date_from: "2026-04-01", date_to: "2026-07-31" } },
+      { name: "arrival_start/arrival_end", params: { arrival_start: "2026-04-01", arrival_end: "2026-07-31" } },
+    ];
 
     const results: any[] = [];
-    for (const unit of units) {
-      let totalFromApi = 0;
-      let page = 1;
-      let lastPage = 1;
-      const latestCheckIn = { date: "", guest: "" };
-
-      do {
+    for (const ps of paramSets) {
+      try {
         const url = new URL("https://public.api.hospitable.com/v2/reservations");
-        url.searchParams.append("properties[]", unit.hosputableListingId!);
-        url.searchParams.set("include", "guest");
+        url.searchParams.append("properties[]", propId);
         url.searchParams.set("per_page", "100");
-        url.searchParams.set("page", String(page));
-
+        for (const [k, v] of Object.entries(ps.params)) {
+          url.searchParams.set(k, v as string);
+        }
         const res = await fetch(url.toString(), {
           headers: { Authorization: `Bearer ${process.env.HOSPITABLE_PAT}`, Accept: "application/json" },
         });
         const data = await res.json();
-        if (!data.data) break;
-
-        lastPage = data.meta?.last_page || 1;
-        totalFromApi += data.data.length;
-
-        for (const r of data.data) {
-          const ci = (r.arrival_date || r.check_in)?.split("T")[0] || "";
-          if (ci > latestCheckIn.date) {
-            latestCheckIn.date = ci;
-            latestCheckIn.guest = r.guest ? `${r.guest.first_name} ${r.guest.last_name}` : "?";
-          }
-        }
-        page++;
-      } while (page <= lastPage);
-
-      const dbCount = await prisma.booking.count({ where: { unitId: unit.id } });
-
-      results.push({
-        unit: unit.unitNumber,
-        apiTotal: totalFromApi,
-        dbTotal: dbCount,
-        pages: lastPage,
-        latestBooking: latestCheckIn.date ? `${latestCheckIn.date} (${latestCheckIn.guest})` : "none",
-        missing: totalFromApi > dbCount ? totalFromApi - dbCount : 0,
-      });
+        results.push({
+          name: ps.name,
+          status: res.status,
+          total: data.meta?.total ?? data.data?.length ?? null,
+          error: data.reason_phrase || null,
+          latestCheckIn: data.data?.length ? data.data.map((r: any) => (r.arrival_date || r.check_in)?.split("T")[0]).sort().pop() : null,
+        });
+      } catch (e) {
+        results.push({ name: ps.name, error: String(e) });
+      }
     }
-
-    return NextResponse.json({ units: results, totalApi: results.reduce((s, r) => s + r.apiTotal, 0), totalDb: results.reduce((s, r) => s + r.dbTotal, 0) });
+    return NextResponse.json({ results });
   }
 
-  // Single property debug
-  if (!propId) return NextResponse.json({ error: "property or all param required" });
+  // Default: fetch all pages for a property
+  if (!propId) return NextResponse.json({ error: "property param required" });
 
   const allReservations: any[] = [];
   let page = 1;
