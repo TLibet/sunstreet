@@ -256,7 +256,7 @@ export function BookingCalendar({
         </div>
         <div>
           <p className="text-xs text-[#8E9B85]">Mgmt Fees ({(mgmtFeePercentage * 100).toFixed(0)}%)</p>
-          <p className="text-lg font-bold text-[#C9A84C]">${(totalRevenue * mgmtFeePercentage).toFixed(2)}</p>
+          <p className="text-lg font-bold text-[#2D3028]">${(totalRevenue * mgmtFeePercentage).toFixed(2)}</p>
         </div>
       </div>
     </div>
