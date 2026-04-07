@@ -148,32 +148,56 @@ export async function syncReservations(options?: {
       units.map((u) => [u.hosputableListingId!, u.id])
     );
 
-    // Default to a wide date range (1 year back, 1 year forward) to get all bookings
-    // The API defaults to only 2 weeks if no date params are provided
+    // Build date ranges in 3-month chunks (API errors on wide ranges)
+    // Cover from 6 months ago to 12 months ahead
     const now = new Date();
-    const defaultStart = options?.startDate || `${now.getFullYear() - 1}-01-01`;
-    const defaultEnd = options?.endDate || `${now.getFullYear() + 1}-12-31`;
+    const dateRanges: { start: string; end: string }[] = [];
 
-    // Fetch reservations per property (to know which unit each reservation belongs to)
-    for (const unit of units) {
-      let page = 1;
-      let lastPage = 1;
-
-      do {
-        const response = await client.getReservations({
-          properties: [unit.hosputableListingId!],
-          start_date: defaultStart,
-          end_date: defaultEnd,
-          include: "financials,guest",
-          page,
-          per_page: 50,
+    if (options?.startDate && options?.endDate) {
+      dateRanges.push({ start: options.startDate, end: options.endDate });
+    } else {
+      // 6-month chunks covering 12 months back to 18 months forward
+      for (let offset = -12; offset < 18; offset += 6) {
+        const s = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+        const e = new Date(now.getFullYear(), now.getMonth() + offset + 6, 0);
+        dateRanges.push({
+          start: s.toISOString().split("T")[0],
+          end: e.toISOString().split("T")[0],
         });
+      }
+    }
 
-        lastPage = response.meta.last_page;
+    // Track seen reservation IDs to avoid double-counting across ranges
+    const seenIds = new Set<string>();
+
+    // Fetch reservations per property, per date range
+    for (const unit of units) {
+      for (const range of dateRanges) {
+        let page = 1;
+        let lastPage = 1;
+
+        do {
+          let response;
+          try {
+            response = await client.getReservations({
+              properties: [unit.hosputableListingId!],
+              start_date: range.start,
+              end_date: range.end,
+              include: "financials,guest",
+              page,
+              per_page: 50,
+            });
+          } catch {
+            break; // Skip this range if API errors
+          }
+
+          lastPage = response.meta.last_page;
 
         for (const reservation of response.data) {
           const hosputableId = reservation.id || (reservation as any).uuid;
           if (!hosputableId) continue;
+          if (seenIds.has(hosputableId)) continue;
+          seenIds.add(hosputableId);
 
           const fin = extractFinancials(reservation);
           const guests = (reservation as any).guests || {};
@@ -287,9 +311,10 @@ export async function syncReservations(options?: {
           }
         }
 
-        page++;
-      } while (page <= lastPage);
-    }
+          page++;
+        } while (page <= lastPage);
+      } // end date range loop
+    } // end unit loop
 
     await prisma.syncLog.update({
       where: { id: syncLog.id },

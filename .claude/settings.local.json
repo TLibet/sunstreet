@@ -49,7 +49,8 @@
       "Bash(curl -s \"https://sunstreet-one.vercel.app/api/debug-unit?property=ec568e66-8732-469f-8ec1-c4dc45b8917c&start=2026-06-01&end=2026-07-31\")",
       "Bash(curl -s \"https://sunstreet-one.vercel.app/api/debug-unit?all=true\")",
       "Bash(curl -s \"https://sunstreet-one.vercel.app/api/debug-unit?property=1d6c3a73-5e15-47d7-9e26-feba393b7158\")",
-      "Bash(python3 -c \":*)"
+      "Bash(python3 -c \":*)",
+      "Bash(curl -s \"https://sunstreet-one.vercel.app/api/debug-unit?property=1d6c3a73-5e15-47d7-9e26-feba393b7158&test-params=true\")"
     ]
   }
 }
